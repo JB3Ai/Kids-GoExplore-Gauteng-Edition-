@@ -1,0 +1,7 @@
+{
+  "name": "Kids entertainment and venues Gauteng",
+  "description": "A high-performance venue discovery app with 312 curated locations, distance-based filtering, and AI-powered deep dives.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
