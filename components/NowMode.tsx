@@ -4,8 +4,8 @@ import { UserProfile, DistanceCategory, Venue } from '../types';
 import { getTopRecommendations, ScoredVenue } from '../services/recommendationEngine';
 import { downloadCalendarEvent } from '../services/calendarService';
 import { calculateRainMode, fetchWeather, RainDecision } from '../services/weatherService';
-// Added missing Sparkles import
-import { MapPin, Calendar, Umbrella, Sun, Battery, Navigation, Settings, Loader2, Info, GpsFixed, Map as MapIcon, Sparkles } from 'lucide-react';
+// Replaced GpsFixed with LocateFixed which exists in lucide-react
+import { MapPin, Calendar, Umbrella, Sun, Battery, Navigation, Settings, Loader2, Info, LocateFixed, Map as MapIcon, Sparkles } from 'lucide-react';
 
 interface NowModeProps {
   onBack: () => void;
@@ -141,7 +141,7 @@ export const NowMode: React.FC<NowModeProps> = ({ onBack, venues }) => {
             <div>
               <label className="text-xs font-black uppercase tracking-widest text-gray-500 mb-3 block">Base Location</label>
               <button onClick={saveLocation} className="w-full py-3 bg-gray-800 hover:bg-gray-700 rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center transition-all border border-gray-700 active:scale-95">
-                <GpsFixed className="w-4 h-4 mr-2 text-emerald-400" />
+                <LocateFixed className="w-4 h-4 mr-2 text-emerald-400" />
                 {profile.homeLat ? 'Sync Current GPS' : 'Set My GPS Base'}
               </button>
             </div>
