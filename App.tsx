@@ -1,12 +1,14 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Venue, DistanceCategory, Environment, AppTheme } from './types';
+import { Venue, DistanceCategory, Environment, AppTheme, UserProfile } from './types';
 import { fetchVenues, getCachedVenues, getFavorites, toggleFavoriteVenue } from './services/sheetService';
 import { VenueCard } from './components/VenueCard';
 import { VenueDetails } from './components/VenueDetails';
 import { WeatherSummary } from './components/WeatherSummary';
 import { NowMode } from './components/NowMode';
-import { Search, Compass, Loader2, WifiOff, SlidersHorizontal, RefreshCw, Clock, MapPin, Sun, Moon, Palette, Zap, PlayCircle, Filter, Banknote, Footprints, Map as MapIcon, Check, Database, Key, AlertCircle } from 'lucide-react';
+import { Onboarding } from './components/Onboarding';
+import { getDistanceKm, getDistanceBand } from './services/recommendationEngine';
+import { Search, Compass, Loader2, WifiOff, SlidersHorizontal, RefreshCw, Clock, MapPin, Sun, Moon, Palette, Zap, PlayCircle, Filter, Banknote, Footprints, Map as MapIcon, Check, Database, Key, AlertCircle, LocateFixed } from 'lucide-react';
 
 type SortOption = 'distance' | 'name' | 'ref' | 'environment' | 'rating';
 
@@ -35,6 +37,11 @@ const App: React.FC = () => {
   const [quotaAlert, setQuotaAlert] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
   
+  const [profile, setProfile] = useState<UserProfile | null>(() => {
+    const saved = localStorage.getItem('FAMILY_NOW_PROFILE');
+    return saved ? JSON.parse(saved) : null;
+  });
+
   const [searchQuery, setSearchQuery] = useState('');
   const [distanceFilter, setDistanceFilter] = useState<DistanceCategory | 'ALL'>('ALL');
   const [envFilter, setEnvFilter] = useState<Environment | 'ALL'>('ALL');
@@ -42,7 +49,7 @@ const App: React.FC = () => {
   const [effortFilter, setEffortFilter] = useState<string>('ALL');
   const [areaFilter, setAreaFilter] = useState<string>('ALL');
   const [activeTags, setActiveTags] = useState<string[]>([]);
-  const [sortBy, setSortBy] = useState<SortOption>('ref');
+  const [sortBy, setSortBy] = useState<SortOption>('distance');
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
 
   useEffect(() => {
@@ -105,6 +112,11 @@ const App: React.FC = () => {
     };
   }, []);
 
+  const handleOnboardingComplete = (newProfile: UserProfile) => {
+    localStorage.setItem('FAMILY_NOW_PROFILE', JSON.stringify(newProfile));
+    setProfile(newProfile);
+  };
+
   const handleSelectKey = async () => {
     if (window.aistudio) {
       await window.aistudio.openSelectKey();
@@ -147,23 +159,22 @@ const App: React.FC = () => {
     setFavorites([...newFavorites]);
   };
 
-  const allTags = useMemo(() => {
-    const tags = new Set<string>();
-    venues.forEach(v => v.tags.forEach(t => tags.add(t)));
-    return Array.from(tags).sort();
-  }, [venues]);
-
-  const allAreas = useMemo(() => {
-    const areas = new Set<string>();
-    venues.forEach(v => {
-      if (v.area) areas.add(v.area);
-      else if (v.location) areas.add(v.location.split(',')[0].trim());
-    });
-    return Array.from(areas).sort();
-  }, [venues]);
-
   const filteredVenues = useMemo(() => {
-    let result = venues.filter(v => {
+    let result = venues.map(v => {
+      let liveDist: number | undefined = undefined;
+      let liveBand = v.distance;
+      
+      if (profile?.homeLat && profile?.homeLng && v.lat && v.lng) {
+        liveDist = getDistanceKm(profile.homeLat, profile.homeLng, v.lat, v.lng);
+        liveBand = getDistanceBand(liveDist);
+      }
+
+      return {
+        ...v,
+        distance: liveBand,
+        calculatedKm: liveDist
+      };
+    }).filter(v => {
       const matchesSearch = 
         v.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         v.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -174,13 +185,15 @@ const App: React.FC = () => {
       const matchesCost = costFilter === 'ALL' || v.costBand === costFilter;
       const matchesEffort = effortFilter === 'ALL' || v.effortLevel === effortFilter;
       const matchesArea = areaFilter === 'ALL' || v.area === areaFilter || v.location.includes(areaFilter);
-      const matchesTags = activeTags.length === 0 || activeTags.every(t => v.tags.includes(t));
       
-      return matchesSearch && matchesDistance && matchesEnv && matchesCost && matchesEffort && matchesArea && matchesTags;
+      return matchesSearch && matchesDistance && matchesEnv && matchesCost && matchesEffort && matchesArea;
     });
 
     result.sort((a, b) => {
       if (sortBy === 'distance') {
+        if (a.calculatedKm !== undefined && b.calculatedKm !== undefined) {
+          return a.calculatedKm - b.calculatedKm;
+        }
         const order = { [DistanceCategory.NEAR]: 0, [DistanceCategory.MED]: 1, [DistanceCategory.FAR]: 2 };
         return order[a.distance] - order[b.distance];
       }
@@ -193,7 +206,7 @@ const App: React.FC = () => {
     });
 
     return result;
-  }, [venues, searchQuery, distanceFilter, envFilter, costFilter, effortFilter, areaFilter, activeTags, sortBy]);
+  }, [venues, searchQuery, distanceFilter, envFilter, costFilter, effortFilter, areaFilter, sortBy, profile]);
 
   const themeClasses = {
     light: 'bg-white text-gray-900',
@@ -208,6 +221,10 @@ const App: React.FC = () => {
     { id: 'pastel', label: 'Pastel Mint', icon: Zap, color: 'bg-emerald-400' },
     { id: 'amber', label: 'Warm Amber', icon: Palette, color: 'bg-amber-500' }
   ];
+
+  if (!profile) {
+    return <Onboarding onComplete={handleOnboardingComplete} />;
+  }
 
   if (viewMode === 'NOW') {
     return <NowMode venues={venues} onBack={() => setViewMode('BROWSE')} />;
@@ -240,6 +257,21 @@ const App: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-1 relative">
+            {profile.homeLat && (
+              <div className="hidden md:flex items-center px-3 py-2 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 rounded-xl mr-2">
+                <LocateFixed size={12} className="mr-2" />
+                <span className="text-[9px] font-black uppercase tracking-widest">GPS Active</span>
+              </div>
+            )}
+            
+            <button 
+              onClick={() => setViewMode('NOW')}
+              className={`p-2 rounded-xl border flex items-center gap-2 transition-all bg-indigo-600 border-indigo-500 text-white shadow-lg active:scale-95 mr-1`}
+            >
+              <Zap size={16} />
+              <span className="text-[10px] font-black uppercase tracking-widest">Now</span>
+            </button>
+
             <button 
               onClick={handleSelectKey}
               className={`p-2 rounded-xl border flex items-center gap-2 transition-all ${hasCustomKey ? 'bg-emerald-500 border-emerald-400 text-white' : (theme === 'dark' ? 'bg-gray-800 border-gray-700 text-gray-400' : 'bg-gray-50 border-gray-200 text-gray-600')}`}
@@ -305,7 +337,7 @@ const App: React.FC = () => {
             className={`px-4 rounded-2xl flex items-center justify-center gap-2 border font-black uppercase tracking-widest text-[10px] whitespace-nowrap active:scale-95 disabled:opacity-50 ${theme === 'dark' ? 'bg-gray-800 border-gray-700 text-blue-400' : (theme === 'pastel' ? 'bg-white border-[#e2ede8] text-[#5ba388]' : 'bg-white border-gray-200 text-blue-600')}`}
           >
             {isRefreshing ? <Loader2 size={16} className="animate-spin" /> : <Database size={16} />}
-            <span className="hidden sm:inline">Fetch from Sheet</span>
+            <span className="hidden sm:inline">Refresh Data</span>
           </button>
         </div>
 
@@ -318,9 +350,8 @@ const App: React.FC = () => {
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as SortOption)}
               >
-                <option value="ref">By Ref</option>
+                <option value="distance">By Real Distance</option>
                 <option value="name">By Name</option>
-                <option value="distance">By Distance</option>
                 <option value="rating">By Rating</option>
               </select>
             </div>

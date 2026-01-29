@@ -7,7 +7,7 @@ import { StarRating } from './StarRating';
 import { generateVenueImage } from '../services/imageService';
 
 interface VenueCardProps {
-  venue: Venue;
+  venue: Venue & { calculatedKm?: number };
   onClick: (venue: Venue) => void;
   isFavorite: boolean;
   onToggleFavorite: () => void;
@@ -106,7 +106,14 @@ export const VenueCard: React.FC<VenueCardProps> = ({ venue, onClick, isFavorite
           <h3 className="text-base font-black text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors line-clamp-2 pr-2 leading-tight">
             {venue.name}
           </h3>
-          <DistanceBadge category={venue.distance} />
+          <div className="flex flex-col items-end gap-1">
+            <DistanceBadge category={venue.distance} />
+            {venue.calculatedKm !== undefined && (
+              <span className="text-[9px] font-black text-blue-500 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded uppercase tracking-tighter">
+                {venue.calculatedKm.toFixed(1)} km
+              </span>
+            )}
+          </div>
         </div>
         
         <div className="flex items-center text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-4">

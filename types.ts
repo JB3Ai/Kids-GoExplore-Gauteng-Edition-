@@ -21,6 +21,7 @@ export interface Venue {
   userRating?: number;
   googleRating: number;
   thumbnailUrl?: string;
+  calculatedKm?: number;
   
   // Family NOW Extended Fields
   area?: string;
@@ -68,10 +69,14 @@ export interface WeatherData {
 }
 
 export interface UserProfile {
+  id: string;
+  onboarded: boolean;
   homeLat?: number;
   homeLng?: number;
   kidsAgeMin: number;
   kidsAgeMax: number;
   maxDistanceBand: DistanceCategory;
   rainLookaheadHours: number;
+  email?: string;
+  newsletterOptIn: boolean;
 }
