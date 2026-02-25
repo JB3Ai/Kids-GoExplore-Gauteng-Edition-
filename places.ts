@@ -1,5 +1,5 @@
 
-import { Venue, DistanceCategory } from '../types';
+import { Venue, DistanceCategory } from './types.ts';
 
 export const PLACES_DATA: Venue[] = [
   {
@@ -125,7 +125,7 @@ export const PLACES_DATA: Venue[] = [
     city: 'Pretoria East',
     location: 'Pretoria',
     lat: -25.8333,
-    lng: 28.3833, // Approx
+    lng: 28.3833,
     category: 'Play',
     subcategory: 'Theme Park',
     indoor: false,
@@ -194,7 +194,7 @@ export const PLACES_DATA: Venue[] = [
     energyLevel: 'Low',
     effortLevel: 'DropIn',
     costBand: 'Free',
-    status: 'OPEN', // Usually Sat only
+    status: 'OPEN',
     phone: '',
     address: 'Greenlyn Village Centre, Menlo Park',
     url: 'https://www.facebook.com/hazelfoodmarket/',
@@ -264,7 +264,7 @@ export const PLACES_DATA: Venue[] = [
     googleRating: 4.7
   },
   {
-    ref: 'P010',
+    ref: 'P10',
     name: 'Sci-Enza Science Centre',
     area: 'Hatfield',
     city: 'Pretoria',
@@ -280,7 +280,7 @@ export const PLACES_DATA: Venue[] = [
     ageMax: 16,
     energyLevel: 'Medium',
     effortLevel: 'DropIn',
-    costBand: 'Free', // Often free or low cost
+    costBand: 'Free',
     status: 'OPEN',
     phone: '012 420 3767',
     address: 'University of Pretoria, Hatfield',

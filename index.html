@@ -10,40 +10,78 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
   <style>
-    body { font-family: 'Inter', sans-serif; transition: background-color 0.3s ease, color 0.3s ease; }
+    body { font-family: 'Inter', sans-serif; transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1), color 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     
-    /* Theme Transitions */
-    * { transition: border-color 0.2s ease, background-color 0.2s ease; }
+    /* Global Theme Transition */
+    * { transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease; }
 
-    /* Pastel Theme - Refined */
+    /* Theme Variable Definitions */
+    :root {
+      --bg-primary: #f9fafb;
+      --bg-secondary: #ffffff;
+      --bg-header: rgba(249, 250, 251, 0.8);
+      --text-primary: #111827;
+      --text-secondary: #4b5563;
+      --border-primary: #e5e7eb;
+      --accent-primary: #059669;
+      --accent-secondary: #10b981;
+    }
+
+    .dark {
+      --bg-primary: #0A0C10; /* Deep Navy-Black */
+      --bg-secondary: #121212; /* UI Surface Graphite */
+      --bg-header: rgba(10, 12, 16, 0.95);
+      --text-primary: #F9FAFB;
+      --text-secondary: #94A3B8;
+      --border-primary: #22324A; /* Slate Blue Steel */
+      --accent-primary: #66FF66; /* Luminous Tech Green */
+      --accent-secondary: #E6E6E6; /* UI Surface Soft Grey */
+    }
+
+    .bg-space {
+      background-image: url('https://storage.googleapis.com/multimodal-toolkit-permanent-blobs/2026/02/24/07/05/29/440590/input_file_1.png');
+      background-size: cover;
+      background-position: center;
+      background-attachment: fixed;
+    }
+
     .pastel { 
-      background-color: #f0f7f4; 
-      color: #2d4a3e; 
+      --bg-primary: #f0f7f4; 
+      --bg-secondary: #ffffff;
+      --bg-header: rgba(240, 247, 244, 0.8);
+      --text-primary: #1a2e26; 
+      --text-secondary: #3d5e50;
+      --border-primary: #e2ede8;
+      --accent-primary: #5ba388;
+      --accent-secondary: #7bc4aa;
     }
-    .pastel .bg-white { background-color: #ffffff; }
-    .pastel .text-gray-900 { color: #1a2e26; }
-    .pastel .text-gray-600 { color: #3d5e50; }
-    .pastel .border-gray-100 { border-color: #e2ede8; }
-    .pastel .bg-gray-50 { background-color: #f7faf9; }
-    .pastel .bg-blue-600 { background-color: #5ba388; }
-    .pastel .text-blue-600 { color: #4a8a71; }
-    .pastel .from-indigo-600 { --tw-gradient-from: #5ba388; }
-    .pastel .to-blue-500 { --tw-gradient-to: #7bc4aa; }
 
-    /* Amber Theme - Refined */
     .amber { 
-      background-color: #fffaf0; 
-      color: #451a03; 
+      --bg-primary: #fffaf0; 
+      --bg-secondary: #ffffff;
+      --bg-header: rgba(255, 250, 240, 0.8);
+      --text-primary: #451a03; 
+      --text-secondary: #92400e;
+      --border-primary: #fef3c7;
+      --accent-primary: #d97706;
+      --accent-secondary: #f59e0b;
     }
-    .amber .bg-white { background-color: #ffffff; }
-    .amber .border-gray-100 { border-color: #fef3c7; }
-    .amber .bg-blue-600 { background-color: #d97706; }
-    
-    .dark .bg-white { background-color: #111827; }
-    .dark .text-gray-900 { color: #f9fafb; }
-    .dark .border-gray-100 { border-color: #374151; }
+
+    /* Helper Utility Classes */
+    .bg-theme-primary { background-color: var(--bg-primary); }
+    .bg-theme-secondary { background-color: var(--bg-secondary); }
+    .bg-theme-header { background-color: var(--bg-header); }
+    .text-theme-primary { color: var(--text-primary); }
+    .text-theme-secondary { color: var(--text-secondary); }
+    .border-theme-primary { border-color: var(--border-primary); }
+    .text-theme-accent { color: var(--accent-primary); }
+    .bg-theme-accent { background-color: var(--accent-primary); }
+
+    /* Theme Card logic as per spec */
+    .dark .bg-theme-card { background-color: #E6E6E6; color: #121212; }
+    .bg-theme-card { background-color: var(--bg-secondary); color: var(--text-primary); }
   </style>
 <script type="importmap">
 {
@@ -52,12 +90,15 @@
     "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
     "react/": "https://esm.sh/react@^19.2.3/",
     "react": "https://esm.sh/react@^19.2.3",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/"
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "fs": "https://esm.sh/fs@^0.0.1-security"
   }
 }
 </script>
+<link rel="stylesheet" href="/index.css">
 </head>
-<body class="bg-gray-50 text-gray-900">
+<body class="bg-theme-primary text-theme-primary">
   <div id="root"></div>
+<script type="module" src="/index.tsx"></script>
 </body>
 </html>

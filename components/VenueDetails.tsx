@@ -2,7 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import { Venue, GroundingChunk } from '../types';
 import { DistanceBadge } from './DistanceBadge';
-import { X, Map, Compass, Lightbulb, Info, ExternalLink, Sparkles, Loader2, Calendar, TreePine, DoorOpen, WifiOff, Star, User, TextQuote, Phone, Globe } from 'lucide-react';
+import { 
+  X, Map, Compass, Lightbulb, Info, ExternalLink, Sparkles, Loader2, 
+  Calendar, TreePine, DoorOpen, WifiOff, Star, User, TextQuote, 
+  Phone, Globe, Clock, Timer, History, ChevronDown, ChevronUp, AlertCircle, Heart, Share2
+} from 'lucide-react';
 import { getVenueDeepDive } from '../services/geminiService';
 import { WeatherWidget } from './WeatherWidget';
 import { StarRating } from './StarRating';
@@ -12,12 +16,21 @@ interface VenueDetailsProps {
   venue: Venue;
   onClose: () => void;
   onRatingUpdate: (ref: string, rating: number) => void;
+  isFavorite: boolean;
+  onToggleFavorite: () => void;
 }
 
-export const VenueDetails: React.FC<VenueDetailsProps> = ({ venue, onClose, onRatingUpdate }) => {
+export const VenueDetails: React.FC<VenueDetailsProps> = ({ 
+  venue, 
+  onClose, 
+  onRatingUpdate,
+  isFavorite,
+  onToggleFavorite
+}) => {
   const [deepDive, setDeepDive] = useState<{ text: string; sources: GroundingChunk[] } | null>(null);
   const [loading, setLoading] = useState(false);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [showFullSchedule, setShowFullSchedule] = useState(false);
 
   useEffect(() => {
     const handleStatusChange = () => setIsOffline(!navigator.onLine);
@@ -60,10 +73,154 @@ export const VenueDetails: React.FC<VenueDetailsProps> = ({ venue, onClose, onRa
     }
   };
 
+  const handleShare = async () => {
+    const shareData = {
+      title: `Check out ${venue.name}`,
+      text: `I found this great place in Gauteng: ${venue.name}. ${venue.description}`,
+      url: venue.url || window.location.href,
+    };
+
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+      } catch (err) {
+        console.error('Error sharing:', err);
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(`${shareData.title}\n${shareData.text}\n${shareData.url}`);
+        alert('Link copied to clipboard!');
+      } catch (err) {
+        console.error('Failed to copy:', err);
+      }
+    }
+  };
+
   const handleUserRating = (rating: number) => {
     saveUserRating(venue.ref, rating);
     onRatingUpdate(venue.ref, rating);
   };
+
+  // Enhanced logic to determine typical hours and real-time status
+  const getScheduleData = () => {
+    const isMarket = (venue.category || '').toLowerCase().includes('food') || (venue.subcategory || '').toLowerCase().includes('market');
+    const isNature = (venue.category || '').toLowerCase().includes('nature') || (venue.subcategory || '').toLowerCase().includes('park');
+    const isAnimals = (venue.category || '').toLowerCase().includes('animal') || (venue.subcategory || '').toLowerCase().includes('farm');
+    const isWater = (venue.category || '').toLowerCase().includes('water') || (venue.subcategory || '').toLowerCase().includes('splash');
+    const isIndoor = venue.environment === 'Indoor';
+
+    const now = new Date();
+    const day = now.getDay();
+    const hour = now.getHours();
+    const min = now.getMinutes();
+    const currentTimeMinutes = hour * 60 + min;
+
+    let weekSchedule: Record<string, string> = {
+      "Monday": "09:00 – 17:00",
+      "Tuesday": "09:00 – 17:00",
+      "Wednesday": "09:00 – 17:00",
+      "Thursday": "09:00 – 17:00",
+      "Friday": "09:00 – 17:00",
+      "Saturday": "09:00 – 18:00",
+      "Sunday": "09:00 – 18:00"
+    };
+
+    let bestTime = "Mid-morning to avoid peak weekend crowds.";
+
+    if (isMarket) {
+      weekSchedule = {
+        "Monday": "Closed",
+        "Tuesday": "Closed",
+        "Wednesday": "Closed",
+        "Thursday": "Closed",
+        "Friday": "Closed",
+        "Saturday": "08:00 – 14:00",
+        "Sunday": "Closed"
+      };
+      bestTime = "Early morning (08:30) for the freshest produce and best pastry selection.";
+    } else if (isNature) {
+      weekSchedule = {
+        "Monday": "06:00 – 18:00",
+        "Tuesday": "06:00 – 18:00",
+        "Wednesday": "06:00 – 18:00",
+        "Thursday": "06:00 – 18:00",
+        "Friday": "06:00 – 18:00",
+        "Saturday": "06:00 – 18:00",
+        "Sunday": "06:00 – 18:00"
+      };
+      bestTime = "Early morning for cool air and active birdlife, or late afternoon for 'Golden Hour' photos.";
+    } else if (isAnimals) {
+      weekSchedule = {
+        "Monday": "08:30 – 16:30",
+        "Tuesday": "08:30 – 16:30",
+        "Wednesday": "08:30 – 16:30",
+        "Thursday": "08:30 – 16:30",
+        "Friday": "08:30 – 16:30",
+        "Saturday": "08:30 – 17:00",
+        "Sunday": "08:30 – 17:00"
+      };
+      bestTime = "Morning (09:00) when animals are most active and being fed.";
+    } else if (isWater) {
+      weekSchedule = {
+        "Monday": "09:00 – 17:00",
+        "Tuesday": "09:00 – 17:00",
+        "Wednesday": "09:00 – 17:00",
+        "Thursday": "09:00 – 17:00",
+        "Friday": "09:00 – 17:00",
+        "Saturday": "09:00 – 18:00",
+        "Sunday": "09:00 – 18:00"
+      };
+      bestTime = "Between 11:00 and 15:00 when the Gauteng sun is warmest.";
+    } else if (isIndoor) {
+      weekSchedule = {
+        "Monday": "09:00 – 18:00",
+        "Tuesday": "09:00 – 18:00",
+        "Wednesday": "09:00 – 18:00",
+        "Thursday": "09:00 – 18:00",
+        "Friday": "09:00 – 19:00",
+        "Saturday": "09:00 – 19:00",
+        "Sunday": "09:00 – 17:00"
+      };
+      bestTime = "Weekdays during school term are quiet; Weekends are best if you arrive at opening.";
+    }
+
+    const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const todayLabel = days[day];
+    const todayHours = weekSchedule[todayLabel];
+    
+    let statusText = "Closed";
+    let statusColor = "text-red-500 bg-red-50 border-red-100";
+    
+    if (todayHours !== "Closed") {
+      const [start, end] = todayHours.split(" – ");
+      const [startH, startM] = start.split(":").map(Number);
+      const [endH, endM] = end.split(":").map(Number);
+      
+      const openMinutes = startH * 60 + startM;
+      const closeMinutes = endH * 60 + endM;
+      
+      if (currentTimeMinutes >= openMinutes && currentTimeMinutes < closeMinutes) {
+        if (closeMinutes - currentTimeMinutes <= 60) {
+          statusText = `Closing soon at ${end}`;
+          statusColor = "text-amber-600 bg-amber-50 border-amber-100";
+        } else {
+          statusText = `Open until ${end}`;
+          statusColor = "text-emerald-600 bg-emerald-50 border-emerald-100";
+        }
+      }
+    }
+
+    return {
+      statusText,
+      statusColor,
+      weekSchedule,
+      bestVisit: bestTime,
+      todayLabel,
+      todayHours
+    };
+  };
+
+  const schedule = getScheduleData();
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-white overflow-hidden animate-in fade-in slide-in-from-bottom duration-300">
@@ -72,15 +229,29 @@ export const VenueDetails: React.FC<VenueDetailsProps> = ({ venue, onClose, onRa
           <span className="text-[10px] font-mono font-bold text-gray-400">REF: #{venue.ref}</span>
           <h2 className="text-xl font-bold text-gray-900 line-clamp-1">{venue.name}</h2>
         </div>
-        <button onClick={onClose} className="p-2 bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200 transition-colors">
-          <X className="w-6 h-6" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={handleShare}
+            className="p-2 bg-gray-100 rounded-full transition-colors hover:bg-gray-200 active:scale-90"
+          >
+            <Share2 className="w-6 h-6 text-gray-400" />
+          </button>
+          <button 
+            onClick={onToggleFavorite}
+            className="p-2 bg-gray-100 rounded-full transition-colors hover:bg-gray-200 active:scale-90"
+          >
+            <Heart className={`w-6 h-6 transition-all duration-300 ${isFavorite ? 'fill-red-500 text-red-500 scale-110' : 'text-gray-400'}`} />
+          </button>
+          <button onClick={onClose} className="p-2 bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200 transition-colors">
+            <X className="w-6 h-6" />
+          </button>
+        </div>
       </header>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-24">
         {isOffline && (
           <div className="bg-amber-50 border border-amber-100 p-3 rounded-xl flex items-center text-amber-800 text-xs font-bold">
-            <WifiOff className="w-4 h-4 mr-2" />
+            <AlertCircle className="w-4 h-4 mr-2" />
             Limited access: You are currently offline. Weather and AI insights are unavailable.
           </div>
         )}
@@ -125,10 +296,62 @@ export const VenueDetails: React.FC<VenueDetailsProps> = ({ venue, onClose, onRa
           </div>
         </section>
 
+        {/* Dynamic Schedule & Timing Section */}
+        <section className="grid grid-cols-1 gap-4">
+          <div className="bg-theme-secondary p-5 rounded-2xl border border-theme-primary flex flex-col space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center text-theme-secondary font-black text-[10px] uppercase tracking-widest">
+                <Clock className="w-3 h-3 mr-2 text-theme-accent" /> Schedule & Status
+              </div>
+              <div className={`px-3 py-1 rounded-full text-[9px] font-black border uppercase tracking-widest ${schedule.statusColor}`}>
+                {schedule.statusText}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div 
+                className="flex items-center justify-between cursor-pointer group"
+                onClick={() => setShowFullSchedule(!showFullSchedule)}
+              >
+                <div className="flex flex-col">
+                  <span className="text-xs text-theme-secondary font-bold uppercase tracking-tighter opacity-50">Today ({schedule.todayLabel})</span>
+                  <p className="text-base font-black text-theme-primary">{schedule.todayHours}</p>
+                </div>
+                <div className="p-2 rounded-lg bg-theme-primary text-theme-secondary group-hover:text-theme-accent transition-colors">
+                  {showFullSchedule ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </div>
+              </div>
+
+              {showFullSchedule && (
+                <div className="pt-4 mt-2 border-t border-theme-primary space-y-2 animate-in slide-in-from-top-2 duration-300">
+                  {Object.entries(schedule.weekSchedule).map(([day, hours]) => (
+                    <div key={day} className={`flex justify-between items-center py-1.5 ${day === schedule.todayLabel ? 'text-theme-accent bg-theme-accent/5 -mx-2 px-2 rounded-lg' : 'text-theme-secondary opacity-70'}`}>
+                      <span className="text-[11px] font-bold">{day}</span>
+                      <span className="text-[11px] font-black">{hours}</span>
+                    </div>
+                  ))}
+                  <p className="text-[9px] font-bold text-theme-secondary italic mt-4 flex items-center gap-1.5 opacity-50">
+                    <History className="w-2.5 h-2.5" /> Typical hours shown. Holiday times may vary.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-theme-accent/5 p-5 rounded-2xl border border-theme-accent/20 flex flex-col space-y-3">
+            <div className="flex items-center text-theme-accent font-black text-[10px] uppercase tracking-widest">
+              <Timer className="w-3 h-3 mr-2" /> Parent Planning Hack
+            </div>
+            <p className="text-sm font-bold text-theme-primary leading-relaxed">
+              {schedule.bestVisit}
+            </p>
+          </div>
+        </section>
+
         <section className="grid grid-cols-2 gap-3">
           <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex flex-col items-center justify-center text-center">
             <div className="flex items-center text-[10px] font-bold text-gray-400 mb-2 uppercase tracking-widest">
-              <span className="w-2 h-2 bg-blue-500 rounded-full mr-1.5"></span>
+              <Star className="w-3 h-3 text-blue-500 mr-1.5" />
               Google Rating
             </div>
             <StarRating rating={venue.googleRating} size={18} showValue={true} />

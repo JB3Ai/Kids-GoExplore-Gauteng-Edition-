@@ -41,6 +41,23 @@ export interface Venue {
   phone?: string;
   address?: string;
   url?: string;
+  openingHours?: string;
+}
+
+export interface UserProfile {
+  id: string;
+  onboarded: boolean;
+  homeLat?: number;
+  homeLng?: number;
+  kidsAgeMin: number;
+  kidsAgeMax: number;
+  maxDistanceBand: DistanceCategory;
+  rainLookaheadHours: number;
+  indoorFirst: boolean;
+  email?: string;
+  phone?: string;
+  newsletterOptIn: boolean;
+  consentTimestamp?: string;
 }
 
 export interface GroundingChunk {
@@ -66,17 +83,4 @@ export interface WeatherData {
     precipitation: number[];
     precipitation_probability: number[];
   };
-}
-
-export interface UserProfile {
-  id: string;
-  onboarded: boolean;
-  homeLat?: number;
-  homeLng?: number;
-  kidsAgeMin: number;
-  kidsAgeMax: number;
-  maxDistanceBand: DistanceCategory;
-  rainLookaheadHours: number;
-  email?: string;
-  newsletterOptIn: boolean;
 }

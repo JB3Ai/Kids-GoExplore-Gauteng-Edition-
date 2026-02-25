@@ -1,12 +1,11 @@
-
 import { GoogleGenAI } from "@google/genai";
 
-// --- IndexedDB Configuration ---
+// --- IndexedDB Configuration for Persistent Caching ---
 const DB_NAME = 'VenueScoutDB';
 const STORE_NAME = 'images';
 const DB_VERSION = 1;
 
-// --- Fallback Image Logic ---
+// --- Fallback Image Logic (High Quality Unsplash) ---
 const FALLBACKS: Record<string, string> = {
   'Water': 'https://images.unsplash.com/photo-1576013551627-0cc20b96c2a7?auto=format&fit=crop&q=80&w=800', 
   'Nature': 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&q=80&w=800',
@@ -50,106 +49,208 @@ const getFromDB = async (key: string): Promise<string | undefined> => {
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
-  } catch (error) {
-    return undefined;
-  }
+  } catch (error) { return undefined; }
 };
 
 const saveToDB = async (key: string, value: string) => {
   try {
     const db = await openDB();
-    return new Promise<void>((resolve, reject) => {
-      const transaction = db.transaction(STORE_NAME, 'readwrite');
-      const store = transaction.objectStore(STORE_NAME);
-      const request = store.put(value, key);
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
+    const transaction = db.transaction(STORE_NAME, 'readwrite');
+    transaction.objectStore(STORE_NAME).put(value, key);
+    
+    // Also sync to server
+    await fetch('/api/images', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ref: key, url: value })
     });
   } catch (error) {}
 };
 
-// --- Request Queue & Rate Limiting ---
-let isGenerating = false;
-const queue: (() => Promise<void>)[] = [];
-let cooldownUntil = 0; 
+// --- Memory Cache for Server Images ---
+let serverImageCache: Record<string, string> | null = null;
+let lastServerFetch = 0;
+let serverFetchPromise: Promise<Record<string, string> | null> | null = null;
+
+const getFromServer = async (key: string): Promise<string | undefined> => {
+  try {
+    // Refresh cache every 5 minutes
+    if (!serverImageCache || Date.now() - lastServerFetch > 5 * 60 * 1000) {
+      if (!serverFetchPromise) {
+        serverFetchPromise = (async () => {
+          try {
+            const res = await fetch('/api/images');
+            if (res.ok) {
+              const data = await res.json();
+              serverImageCache = data;
+              lastServerFetch = Date.now();
+              return data;
+            }
+          } catch (e) {
+            console.error("Server image fetch failed", e);
+          } finally {
+            serverFetchPromise = null;
+          }
+          return serverImageCache;
+        })();
+      }
+      await serverFetchPromise;
+    }
+    return serverImageCache?.[key];
+  } catch (e) {}
+  return undefined;
+};
+
+// --- Request Queuing & Backoff ---
+let isProcessingQueue = false;
+const requestQueue: (() => Promise<void>)[] = [];
+let currentMinDelay = 3000; // Start with 3 seconds between requests
+const MAX_DELAY = 10000; // Max 10 seconds between requests if hitting limits
 
 const processQueue = async () => {
-  if (isGenerating || queue.length === 0) return;
+  if (isProcessingQueue || requestQueue.length === 0) return;
+  isProcessingQueue = true;
   
-  if (Date.now() < cooldownUntil) {
-    setTimeout(processQueue, 2000);
-    return;
+  while (requestQueue.length > 0) {
+    const task = requestQueue.shift();
+    if (task) {
+      await task();
+      // Add some jitter to the delay
+      const jitter = Math.random() * 1000;
+      await new Promise(resolve => setTimeout(resolve, currentMinDelay + jitter));
+    }
   }
+  
+  isProcessingQueue = false;
+};
 
-  isGenerating = true;
-  const task = queue.shift();
-  if (task) {
-    try { await task(); } catch (e) {}
-  }
-
-  setTimeout(() => {
-    isGenerating = false;
+const queueRequest = <T>(fn: () => Promise<T>): Promise<T> => {
+  return new Promise((resolve, reject) => {
+    requestQueue.push(async () => {
+      try {
+        const result = await fn();
+        resolve(result);
+      } catch (e) {
+        reject(e);
+      }
+    });
     processQueue();
-  }, 3000); 
+  });
+};
+
+async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
+  let lastError: any;
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const result = await fn();
+      // If successful, slowly decrease delay back to baseline
+      if (currentMinDelay > 3000) {
+        currentMinDelay = Math.max(3000, currentMinDelay - 500);
+      }
+      return result;
+    } catch (error: any) {
+      lastError = error;
+      const errStr = error.toString();
+      
+      // If it's a 429, wait longer and increase global delay
+      if (errStr.includes("429") || errStr.includes("RESOURCE_EXHAUSTED")) {
+        currentMinDelay = Math.min(MAX_DELAY, currentMinDelay + 2000);
+        const waitTime = Math.pow(2, i) * 10000; // 10s, 20s, 40s
+        console.warn(`Quota exceeded, increasing delay to ${currentMinDelay}ms and retrying in ${waitTime}ms...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        continue;
+      }
+      
+      throw error; // Other errors fail immediately
+    }
+  }
+  throw lastError;
+}
+
+/**
+ * Clears the IndexedDB image cache.
+ */
+export const clearImageCache = async () => {
+  try {
+    const db = await openDB();
+    const transaction = db.transaction(STORE_NAME, 'readwrite');
+    transaction.objectStore(STORE_NAME).clear();
+  } catch (error) {
+    console.error("Failed to clear image cache:", error);
+  }
 };
 
 /**
- * Generates an actual, search-informed photograph of a venue.
- * Uses Gemini 3 Pro Image with Google Search grounding.
+ * Attempts to fetch a real image URL or generates one using Gemini 3 Pro with Google Search.
  */
 export async function generateVenueImage(ref: string, name: string, tags: string[]): Promise<string> {
   const cached = await getFromDB(ref);
   if (cached) return cached;
 
+  // Check server cache
+  const serverCached = await getFromServer(ref);
+  if (serverCached) {
+    saveToDB(ref, serverCached); // Cache locally too
+    return serverCached;
+  }
+
   const fallback = getFallbackImage(tags);
 
-  return new Promise((resolve) => {
-    const task = async () => {
+  return queueRequest(async () => {
+    try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      // Prompt forces the model to use search results for accuracy
-      const prompt = `Search for the actual family-friendly venue "${name}" in Gauteng. 
-      Based on real search results, generate a hyper-realistic, photorealistic high-quality photograph of this specific venue. 
-      Ensure the architecture and environment accurately reflect the actual place. 
-      Style: Vibrant, bright, child-friendly photograph. No text, people, or logos.`;
+      
+      return await withRetry(async () => {
+        // Stage 1: Attempt to find a real, direct image URL via model knowledge
+        // Removed googleSearch from flash model as it's officially supported on Pro Image
+        const searchResponse = await ai.models.generateContent({
+          model: 'gemini-3-flash-preview',
+          contents: `Provide a direct, high-resolution public image URL for the venue "${name}" in Gauteng. Return ONLY the URL string. If you don't have a specific URL, return "GENERATE".`,
+        });
 
-      try {
-        const response = await ai.models.generateContent({
+        const resultText = searchResponse.text?.trim() || "";
+        if (resultText.startsWith('http') && (resultText.toLowerCase().endsWith('.jpg') || resultText.toLowerCase().endsWith('.png') || resultText.toLowerCase().endsWith('.webp') || resultText.toLowerCase().endsWith('.jpeg'))) {
+          saveToDB(ref, resultText);
+          return resultText;
+        }
+
+        // Stage 2: Fallback to high-quality search-informed generation
+        const genResponse = await ai.models.generateContent({
           model: 'gemini-3-pro-image-preview',
-          contents: { parts: [{ text: prompt }] },
+          contents: { 
+            parts: [{ 
+              text: `Generate a professional, photorealistic architectural or environmental photograph of the venue "${name}" in Gauteng. Ensure the image is vibrant and accurately reflects the real location. Aspect Ratio: 16:9. No people, no text.` 
+            }] 
+          },
           config: {
             imageConfig: { aspectRatio: "16:9", imageSize: "1K" },
-            tools: [{ googleSearch: {} }] // Enabled for actual real-world accuracy
+            tools: [{ googleSearch: {} }]
           }
         });
 
         let imageUrl = '';
-        const candidate = response.candidates?.[0];
-        if (candidate?.content?.parts) {
-          for (const part of candidate.content.parts) {
-            if (part.inlineData) {
-              imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-              break;
-            }
+        const parts = genResponse.candidates?.[0]?.content?.parts || [];
+        for (const part of parts) {
+          if (part.inlineData) {
+            imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+            break;
           }
         }
 
         if (imageUrl) {
           saveToDB(ref, imageUrl);
-          resolve(imageUrl);
-        } else {
-          resolve(fallback);
+          return imageUrl;
         }
-      } catch (error: any) {
-        const errStr = error.toString();
-        if (errStr.includes("Requested entity was not found")) {
-          // Trigger re-auth event for the main UI
-          window.dispatchEvent(new CustomEvent('gemini-reauth-required'));
-        }
-        resolve(fallback);
+        
+        return fallback;
+      });
+    } catch (error: any) {
+      const errStr = error.toString();
+      if (errStr.includes("Requested entity was not found")) {
+        window.dispatchEvent(new CustomEvent('gemini-reauth-required'));
       }
-    };
-
-    queue.push(task);
-    processQueue();
+      console.error("Image Service Error:", error);
+      return fallback;
+    }
   });
 }

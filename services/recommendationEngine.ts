@@ -1,7 +1,7 @@
 
-import { Venue, UserProfile, DistanceCategory } from '../types';
-import { PLACES_DATA } from '../data/places';
-import { RainDecision } from './weatherService';
+import { Venue, UserProfile, DistanceCategory } from '../types.ts';
+import { PLACES_DATA } from '../places.ts';
+import { RainDecision } from './weatherService.ts';
 
 export interface ScoredVenue extends Venue {
   score: number;
@@ -93,14 +93,7 @@ export function getTopRecommendations(
       if (!overlaps) return false;
     }
 
-    let band = place.distance || DistanceCategory.FAR;
-    if (userProfile.homeLat && userProfile.homeLng && place.lat && place.lng) {
-      const km = getDistanceKm(userProfile.homeLat, userProfile.homeLng, place.lat, place.lng);
-      band = getDistanceBand(km);
-    }
-    
-    const bandOrder = { [DistanceCategory.NEAR]: 0, [DistanceCategory.MED]: 1, [DistanceCategory.FAR]: 2 };
-    if (bandOrder[band] > bandOrder[userProfile.maxDistanceBand]) return false;
+    // REMOVED: Distance band hard filtering. All venues are considered.
 
     if (!isOpenNow(place, now)) return false;
 

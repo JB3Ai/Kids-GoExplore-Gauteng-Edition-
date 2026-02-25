@@ -55,12 +55,49 @@ export function toggleFavoriteVenue(ref: string): string[] {
     favorites.splice(index, 1);
   }
   localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
+  
+  // Optimistic sync if profile exists
+  const profileStr = localStorage.getItem('FAMILY_NOW_PROFILE');
+  if (profileStr) {
+    try {
+      const profile = JSON.parse(profileStr);
+      syncProfileWithBackend(profile.id, { 
+        favorites, 
+        ratings: getUserRatings() 
+      });
+    } catch (e) {}
+  }
+  
   return favorites;
 }
 
-/**
- * Robust CSV row splitter that handles quoted commas and spaces correctly.
- */
+export async function syncProfileWithBackend(userId: string, data: { favorites: string[], ratings: Record<string, number> }) {
+  try {
+    await fetch(`/api/profile/${userId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+  } catch (e) {
+    console.error("Failed to sync profile", e);
+  }
+}
+
+export async function loadProfileFromBackend(userId: string) {
+  try {
+    const res = await fetch(`/api/profile/${userId}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.favorites) localStorage.setItem(FAVORITES_KEY, JSON.stringify(data.favorites));
+      if (data.ratings) localStorage.setItem(RATINGS_KEY, JSON.stringify(data.ratings));
+      return data;
+    }
+  } catch (e) {
+    console.error("Failed to load profile", e);
+  }
+  return null;
+}
+
 function splitCSVRow(row: string): string[] {
   const result: string[] = [];
   let current = "";
@@ -69,10 +106,8 @@ function splitCSVRow(row: string): string[] {
   for (let i = 0; i < row.length; i++) {
     const char = row[i];
     if (char === '"') {
-      // Toggle quote state
       inQuotes = !inQuotes;
     } else if (char === ',' && !inQuotes) {
-      // Split point
       result.push(current.trim());
       current = "";
     } else {
@@ -87,23 +122,29 @@ function parseCSV(text: string): Venue[] {
   const lines = text.split(/\r?\n/);
   if (lines.length < 2) return [];
   
-  // Dynamic header mapping
   const headers = splitCSVRow(lines[0]).map(h => h.trim().toLowerCase().replace(/^"|"$/g, ''));
-  const findCol = (keys: string[]) => headers.findIndex(h => keys.some(k => h.includes(k.toLowerCase())));
+  const findCol = (keys: string[], defaultIdx: number) => {
+    const idx = headers.findIndex(h => keys.some(k => h.includes(k.toLowerCase())));
+    return idx !== -1 ? idx : defaultIdx;
+  };
 
+  // Specific mapping based on user feedback:
+  // Column D (index 3) is Category
+  // Column E (index 4) is Distance Band
   const idxMap = {
-    ref: findCol(['ref', '#', 'id']),
-    name: findCol(['name', 'title']),
-    location: findCol(['location', 'area', 'address']),
-    distance: findCol(['distance', 'band']),
-    description: findCol(['description', 'about']),
-    notes: findCol(['notes', 'tips']),
-    lat: findCol(['lat', 'latitude']),
-    lng: findCol(['lng', 'longitude']),
-    cost: findCol(['cost', 'price']),
-    effort: findCol(['effort']),
-    env: findCol(['env', 'indoor', 'outdoor']),
-    tags: findCol(['tags', 'categories', 'type'])
+    ref: findCol(['ref', '#', 'id'], 0),
+    name: findCol(['name', 'title'], 1),
+    location: findCol(['location', 'area', 'address', 'city'], 2),
+    category: findCol(['catagory', 'category'], 3), // Column D
+    distance: findCol(['distance', 'band'], 4),     // Column E
+    description: findCol(['description', 'about'], 5),
+    notes: findCol(['notes', 'tips'], 6),
+    lat: findCol(['lat', 'latitude'], 7),
+    lng: findCol(['lng', 'longitude'], 8),
+    cost: findCol(['cost', 'price'], 9),
+    effort: findCol(['effort'], 10),
+    env: findCol(['env', 'indoor', 'outdoor'], 11),
+    tags: findCol(['tags', 'categories', 'type'], 12),
   };
 
   const rows = lines.slice(1);
@@ -111,10 +152,7 @@ function parseCSV(text: string): Venue[] {
   
   const parsed = rows.map((row): Venue | null => {
     if (!row.trim()) return null;
-    
-    // Use the robust splitter instead of regex
     const clean = splitCSVRow(row).map(p => p.replace(/^"|"$/g, '').trim());
-    
     if (clean.length < 2) return null;
 
     const val = (idx: number) => idx !== -1 && idx < clean.length ? clean[idx] : '';
@@ -122,11 +160,16 @@ function parseCSV(text: string): Venue[] {
     const name = val(idxMap.name);
     if (!name) return null;
 
+    // Enhanced distance band parsing
     const dStr = (val(idxMap.distance) || '').toUpperCase();
     let distance = DistanceCategory.FAR;
-    if (dStr.includes('NEAR') || dStr.includes('🟢')) distance = DistanceCategory.NEAR;
-    else if (dStr.includes('MED') || dStr.includes('🟡')) distance = DistanceCategory.MED;
-    else if (dStr.includes('FAR') || dStr.includes('🔴')) distance = DistanceCategory.FAR;
+    if (dStr.includes('NEAR') || dStr.includes('🟢') || dStr.includes('GREEN')) {
+      distance = DistanceCategory.NEAR;
+    } else if (dStr.includes('MED') || dStr.includes('🟡') || dStr.includes('YELLOW')) {
+      distance = DistanceCategory.MED;
+    } else if (dStr.includes('FAR') || dStr.includes('🔴') || dStr.includes('RED')) {
+      distance = DistanceCategory.FAR;
+    }
 
     const description = val(idxMap.description);
     const notes = val(idxMap.notes);
@@ -142,19 +185,26 @@ function parseCSV(text: string): Venue[] {
     
     const ref = val(idxMap.ref) || `sh-${Math.random().toString(36).substr(2, 5)}`;
 
+    // Ensure lat/lng are actual numbers
+    const rawLat = val(idxMap.lat);
+    const rawLng = val(idxMap.lng);
+    const lat = rawLat ? parseFloat(rawLat.replace(/[^\d.-]/g, '')) : undefined;
+    const lng = rawLng ? parseFloat(rawLng.replace(/[^\d.-]/g, '')) : undefined;
+
     return {
       ref,
       name,
       location: val(idxMap.location) || 'Gauteng',
       distance,
-      description: description || 'No description available in sheet.',
+      description: description || 'No description available.',
       notes: notes || '',
       environment,
       tags: tags.length > 0 ? tags : ['General'],
-      lat: parseFloat(val(idxMap.lat)) || undefined,
-      lng: parseFloat(val(idxMap.lng)) || undefined,
+      lat: (lat && !isNaN(lat) && lat !== 0) ? lat : undefined,
+      lng: (lng && !isNaN(lng) && lng !== 0) ? lng : undefined,
       costBand: (val(idxMap.cost) || 'Mid') as any,
       effortLevel: (val(idxMap.effort) || 'DropIn') as any,
+      category: val(idxMap.category),
       userRating: userRatings[ref],
       googleRating: getStableRating(name),
       status: 'OPEN'
@@ -170,7 +220,7 @@ export async function fetchVenues(forceRefresh = false): Promise<Venue[]> {
       const cached = localStorage.getItem(CACHE_KEY);
       if (cached) {
         const { data, timestamp } = JSON.parse(cached);
-        if (Date.now() - timestamp < 1000 * 60 * 60 * 12) { // 12h cache
+        if (Date.now() - timestamp < 1000 * 60 * 60 * 12) {
           const ratings = getUserRatings();
           return (data as Venue[]).map(v => ({ ...v, userRating: ratings[v.ref] }));
         }
@@ -199,6 +249,18 @@ export function saveUserRating(ref: string, rating: number) {
   const ratings = getUserRatings();
   ratings[ref] = rating;
   localStorage.setItem(RATINGS_KEY, JSON.stringify(ratings));
+
+  // Optimistic sync if profile exists
+  const profileStr = localStorage.getItem('FAMILY_NOW_PROFILE');
+  if (profileStr) {
+    try {
+      const profile = JSON.parse(profileStr);
+      syncProfileWithBackend(profile.id, { 
+        favorites: getFavorites(), 
+        ratings 
+      });
+    } catch (e) {}
+  }
 }
 
 export function getCachedVenues(): Venue[] | null {

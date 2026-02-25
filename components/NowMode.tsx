@@ -4,8 +4,8 @@ import { UserProfile, DistanceCategory, Venue } from '../types';
 import { getTopRecommendations, ScoredVenue } from '../services/recommendationEngine';
 import { downloadCalendarEvent } from '../services/calendarService';
 import { calculateRainMode, fetchWeather, RainDecision } from '../services/weatherService';
-// Replaced GpsFixed with LocateFixed which exists in lucide-react
-import { MapPin, Calendar, Umbrella, Sun, Battery, Navigation, Settings, Loader2, Info, LocateFixed, Map as MapIcon, Sparkles } from 'lucide-react';
+import { getCurrentLocation } from '../lib/location';
+import { MapPin, Calendar, Umbrella, Sun, Navigation, Settings, Loader2, Info, LocateFixed, Sparkles, ChevronLeft, ShieldCheck } from 'lucide-react';
 
 interface NowModeProps {
   onBack: () => void;
@@ -16,248 +16,193 @@ export const NowMode: React.FC<NowModeProps> = ({ onBack, venues }) => {
   const [loading, setLoading] = useState(true);
   const [recommendations, setRecommendations] = useState<ScoredVenue[]>([]);
   const [rainDecision, setRainDecision] = useState<RainDecision>({ rainMode: false, reason: '' });
-  const [userLoc, setUserLoc] = useState<{lat: number, lng: number} | null>(null);
-  const [locSource, setLocSource] = useState<'GPS' | 'DEFAULT' | 'HOME'>('DEFAULT');
+  const [locStatus, setLocStatus] = useState<'GPS' | 'FALLBACK' | 'SAVED'>('SAVED');
 
   const [profile, setProfile] = useState<UserProfile>(() => {
     const saved = localStorage.getItem('FAMILY_NOW_PROFILE');
     return saved ? JSON.parse(saved) : {
+      id: crypto.randomUUID(),
+      onboarded: true,
       kidsAgeMin: 7,
       kidsAgeMax: 10,
       maxDistanceBand: DistanceCategory.MED,
       rainLookaheadHours: 2,
+      newsletterOptIn: false
     };
   });
 
-  const [showConfig, setShowConfig] = useState(false);
-
   useEffect(() => {
-    localStorage.setItem('FAMILY_NOW_PROFILE', JSON.stringify(profile));
-  }, [profile]);
-
-  useEffect(() => {
-    const init = async () => {
+    const generatePlan = async () => {
       setLoading(true);
       
-      let lat = -26.2041;
-      let lng = 28.0473;
-      let source: 'GPS' | 'DEFAULT' | 'HOME' = 'DEFAULT';
+      // Step 1: Fresh GPS Lookup (Spec: request GPS on each press)
+      const locRes = await getCurrentLocation(6000);
+      let lat = profile.homeLat || -26.2041;
+      let lng = profile.homeLng || 28.0473;
       
-      try {
-        if (profile.homeLat && profile.homeLng) {
-          lat = profile.homeLat;
-          lng = profile.homeLng;
-          source = 'HOME';
-          setUserLoc({ lat, lng });
-        } else if (navigator.geolocation) {
-           await new Promise<void>((resolve) => {
-             navigator.geolocation.getCurrentPosition(
-               (pos) => {
-                 lat = pos.coords.latitude;
-                 lng = pos.coords.longitude;
-                 source = 'GPS';
-                 setUserLoc({ lat, lng });
-                 resolve();
-               }, 
-               () => resolve(), 
-               { timeout: 5000 }
-             );
-           });
-        }
-      } catch (e) {
-        console.warn("Loc error", e);
+      if (locRes.ok) {
+        lat = locRes.lat;
+        lng = locRes.lng;
+        setLocStatus('GPS');
+        // Privacy: Overwrite single last_known, no history trail
+        localStorage.setItem('last_known_lat', String(lat));
+        localStorage.setItem('last_known_lng', String(lng));
+      } else {
+        setLocStatus(profile.homeLat ? 'SAVED' : 'FALLBACK');
       }
 
-      setLocSource(source);
-
+      // Step 2: Open-Meteo Weather Lookahead (Spec: compute RAIN_MODE for next 2 hours)
       const weather = await fetchWeather('', lat, lng);
       const decision = weather 
         ? calculateRainMode(weather, profile.rainLookaheadHours) 
-        : { rainMode: false, reason: 'Weather unavailable' };
+        : { rainMode: false, reason: 'Weather offline' };
       
       setRainDecision(decision);
 
+      // Step 3: Compute Top 7 Scored
       const recs = getTopRecommendations({ ...profile, homeLat: lat, homeLng: lng }, decision, venues);
       setRecommendations(recs);
       
       setLoading(false);
     };
 
-    init();
+    generatePlan();
   }, [profile, venues]);
-
-  const saveLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((pos) => {
-        setProfile(p => ({ ...p, homeLat: pos.coords.latitude, homeLng: pos.coords.longitude }));
-        setShowConfig(false);
-      });
-    }
-  };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-6 text-center">
-        <Loader2 className="w-12 h-12 text-emerald-400 animate-spin mb-4" />
-        <h2 className="text-xl font-black uppercase tracking-widest text-emerald-400">Analysing Constraints...</h2>
-        <p className="text-gray-400 text-[10px] font-mono mt-2 uppercase tracking-tighter">Locating Family • Checking Skies • Optimising Fun</p>
+      <div className="min-h-screen bg-gray-950 text-white flex flex-col items-center justify-center p-8 text-center font-sans">
+        <div className="relative mb-8">
+          <div className="absolute inset-0 bg-emerald-500/10 blur-3xl animate-pulse"></div>
+          <Loader2 className="w-16 h-16 text-emerald-400 animate-spin relative" />
+        </div>
+        <h2 className="text-2xl font-black uppercase tracking-[0.2em] text-emerald-400">Syncing Gauteng...</h2>
+        <p className="text-gray-500 text-[10px] font-black mt-4 uppercase tracking-[0.2em] max-w-xs leading-loose">
+          Fresh GPS Lookup • Rain Mode Probe • Scoring {venues.length} Curated Venues
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 pb-20 font-sans">
-      <header className="sticky top-0 z-20 bg-gray-900/80 backdrop-blur-md border-b border-gray-800 p-4 flex items-center justify-between">
-        <button onClick={onBack} className="text-xs font-black uppercase tracking-widest text-gray-500 hover:text-white flex items-center">
-          <ChevronLeft className="w-4 h-4 mr-1" /> Browse
-        </button>
-        
-        <div className="flex items-center space-x-3">
-          <div className="flex flex-col items-end">
-            <span className={`flex items-center px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest border ${locSource === 'GPS' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-gray-800 text-gray-400 border-gray-700'}`}>
-              <MapPin className="w-2.5 h-2.5 mr-1" /> {locSource === 'GPS' ? 'Live GPS' : (locSource === 'HOME' ? 'Home Set' : 'Default JHB')}
-            </span>
-          </div>
-          
-          {rainDecision.rainMode ? (
-            <span className="flex items-center px-2 py-1 bg-indigo-500/20 text-indigo-300 rounded-lg text-[10px] font-black uppercase tracking-widest border border-indigo-500/30">
-              <Umbrella className="w-3 h-3 mr-1" /> Rain Mode
-            </span>
-          ) : (
-            <span className="flex items-center px-2 py-1 bg-emerald-500/20 text-emerald-300 rounded-lg text-[10px] font-black uppercase tracking-widest border border-emerald-500/30">
-              <Sun className="w-3 h-3 mr-1" /> Clear Skies
-            </span>
-          )}
-          
-          <button onClick={() => setShowConfig(!showConfig)} className={`p-2 rounded-lg transition-colors h-9 w-9 flex items-center justify-center ${showConfig ? 'bg-emerald-600 text-white' : 'bg-gray-800 text-gray-400'}`}>
-            <Settings className="w-4 h-4" />
+    <div className="min-h-screen bg-gray-950 text-gray-100 pb-24 font-sans selection:bg-emerald-500/30">
+      <header className="sticky top-0 z-30 bg-gray-950/80 backdrop-blur-xl border-b border-gray-900 p-4">
+        <div className="max-w-2xl mx-auto flex items-center justify-between">
+          <button onClick={onBack} className="flex items-center text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 hover:text-white transition-colors">
+            <ChevronLeft className="w-4 h-4 mr-1" /> Explorer
           </button>
+          
+          <div className="flex items-center gap-2">
+            <div className={`flex items-center px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border transition-all ${locStatus === 'GPS' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-gray-900 text-gray-400 border-gray-800'}`}>
+              <LocateFixed className={`w-3 h-3 mr-1.5 ${locStatus === 'GPS' ? 'animate-pulse' : ''}`} /> 
+              {locStatus === 'GPS' ? 'GPS Active' : 'Home Area'}
+            </div>
+            
+            {rainDecision.rainMode ? (
+              <div className="flex items-center px-3 py-1.5 bg-indigo-500/20 text-indigo-300 rounded-full text-[9px] font-black uppercase tracking-widest border border-indigo-500/30">
+                <Umbrella className="w-3 h-3 mr-1.5" /> Rain Mode
+              </div>
+            ) : (
+              <div className="flex items-center px-3 py-1.5 bg-emerald-500/10 text-emerald-500/80 rounded-full text-[9px] font-black uppercase tracking-widest border border-emerald-500/10">
+                <Sun className="w-3 h-3 mr-1.5" /> Fair Skies
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
-      {showConfig && (
-        <div className="bg-gray-900 border-b border-gray-800 p-6 space-y-6 animate-in slide-in-from-top duration-300">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="text-xs font-black uppercase tracking-widest text-gray-500 mb-3 block">Base Location</label>
-              <button onClick={saveLocation} className="w-full py-3 bg-gray-800 hover:bg-gray-700 rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center transition-all border border-gray-700 active:scale-95">
-                <LocateFixed className="w-4 h-4 mr-2 text-emerald-400" />
-                {profile.homeLat ? 'Sync Current GPS' : 'Set My GPS Base'}
-              </button>
-            </div>
-
-            <div>
-              <label className="text-xs font-black uppercase tracking-widest text-gray-500 mb-3 block">Travel Range</label>
-              <div className="flex bg-gray-800 p-1 rounded-xl">
-                {[DistanceCategory.NEAR, DistanceCategory.MED, DistanceCategory.FAR].map((d) => (
-                  <button
-                    key={d}
-                    onClick={() => setProfile(p => ({ ...p, maxDistanceBand: d }))}
-                    className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${profile.maxDistanceBand === d ? 'bg-emerald-600 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}
-                  >
-                    {d}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <main className="p-4 space-y-4 max-w-2xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-black text-white leading-tight">
-            Gauteng <span className="text-emerald-400">Now.</span>
+      <main className="p-6 space-y-8 max-w-2xl mx-auto animate-in fade-in duration-1000">
+        <div className="space-y-3">
+          <h1 className="text-4xl font-black text-white leading-none tracking-tight">
+            TOP <span className="text-emerald-400">SEVEN.</span>
           </h1>
-          <p className="text-gray-500 text-sm font-bold mt-1 uppercase tracking-widest">Calculated recommendations for your family</p>
+          <p className="text-gray-500 text-[10px] font-black uppercase tracking-[0.3em]">Fit for {profile.kidsAgeMin}-{profile.kidsAgeMax} Years • {profile.maxDistanceBand === 'NEAR' ? 'Local' : 'Cross-City'}</p>
         </div>
 
         {recommendations.length === 0 ? (
-          <div className="text-center py-20 bg-gray-900/50 rounded-3xl border-2 border-gray-800 border-dashed">
-            <Info className="w-10 h-10 text-gray-700 mx-auto mb-4" />
-            <p className="text-gray-400 font-black uppercase tracking-widest mb-2">No Optimized Matches</p>
-            <p className="text-gray-600 text-xs px-10">Try expanding your 'Travel Range' in settings or checking if venues are currently open.</p>
+          <div className="py-20 bg-gray-900/40 rounded-[2.5rem] border-2 border-gray-900 border-dashed flex flex-col items-center text-center px-10">
+            <Info className="w-12 h-12 text-gray-800 mb-6" />
+            <p className="text-gray-400 font-black uppercase tracking-widest mb-4">No Perfect Matches</p>
+            <p className="text-gray-600 text-xs font-bold leading-relaxed">
+              Nothing currently matches your age constraints and travel tolerance for these conditions.
+            </p>
           </div>
         ) : (
-          recommendations.map((venue, idx) => (
-            <div key={venue.ref} className="bg-gray-900 rounded-3xl border border-gray-800 overflow-hidden hover:border-gray-700 transition-all active:scale-[0.99] group shadow-xl">
-              <div className="p-6">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex items-center space-x-3">
-                    <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
-                       <span className="text-xl font-black text-emerald-400">{venue.score}</span>
-                    </div>
-                    <div className="flex flex-col">
-                      <h3 className="text-lg font-black text-white leading-tight">{venue.name}</h3>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-[10px] text-gray-500 font-black uppercase tracking-widest">{venue.area || venue.location}</span>
+          <div className="space-y-6">
+            {recommendations.map((venue, idx) => (
+              <div key={venue.ref} className="group relative bg-gray-900 rounded-[2.5rem] border border-gray-800 overflow-hidden hover:border-emerald-500/30 transition-all duration-500 active:scale-[0.98] shadow-2xl">
+                {/* Ranking Badge */}
+                <div className="absolute top-6 left-6 z-10 w-12 h-12 rounded-2xl bg-gray-950/90 backdrop-blur-md border border-gray-800 flex items-center justify-center font-black text-emerald-400 text-xl shadow-xl">
+                  {idx + 1}
+                </div>
+
+                <div className="p-8 pt-20 sm:pt-8">
+                  <div className="flex justify-between items-start mb-6">
+                    <div className="sm:pl-16">
+                      <h3 className="text-2xl font-black text-white leading-tight mb-2 group-hover:text-emerald-400 transition-colors">{venue.name}</h3>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[10px] text-gray-500 font-black uppercase tracking-widest flex items-center">
+                          <MapPin className="w-3 h-3 mr-1.5 text-gray-600" />
+                          {venue.area || venue.location}
+                        </span>
                         {venue.calculatedKm !== undefined && (
-                          <span className="text-[10px] text-emerald-500 font-black uppercase tracking-widest bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                          <span className="text-[10px] text-emerald-500/80 font-black uppercase tracking-tighter bg-emerald-500/5 px-2 py-0.5 rounded-lg border border-emerald-500/10">
                             {venue.calculatedKm.toFixed(1)} km
                           </span>
                         )}
                       </div>
                     </div>
+                    <div className="hidden sm:flex flex-col items-end">
+                      <div className="text-3xl font-black text-gray-800 group-hover:text-emerald-900/50 transition-colors">{venue.score}</div>
+                      <span className="text-[8px] font-black uppercase tracking-widest text-gray-700">FIT %</span>
+                    </div>
+                  </div>
+
+                  {venue.whyNow && (
+                    <div className="flex items-center text-[10px] font-black uppercase tracking-widest text-emerald-400 mb-8 bg-emerald-950/20 p-4 rounded-[1.5rem] border border-emerald-500/10 backdrop-blur-sm">
+                      <Sparkles className="w-4 h-4 mr-2 text-emerald-400" />
+                      {venue.whyNow}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <button 
+                      onClick={() => downloadCalendarEvent(venue)}
+                      className="flex items-center justify-center py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-[1.25rem] text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95"
+                    >
+                      <Calendar className="w-4 h-4 mr-2" /> Quick Add
+                    </button>
+                    <button 
+                      onClick={() => {
+                          const q = encodeURIComponent(`${venue.name} ${venue.location}`);
+                          window.open(`https://www.google.com/maps/search/?api=1&query=${q}`, '_blank');
+                      }}
+                      className="flex items-center justify-center py-4 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-[1.25rem] text-[10px] font-black uppercase tracking-widest transition-all border border-gray-700 active:scale-95"
+                    >
+                      <Navigation className="w-4 h-4 mr-2" /> Go Now
+                    </button>
                   </div>
                 </div>
-
-                {venue.whyNow && (
-                  <div className="flex items-center text-[10px] font-black uppercase tracking-widest text-emerald-400 mb-6 bg-emerald-950/20 p-3 rounded-xl border border-emerald-900/30">
-                    <Sparkles className="w-3.5 h-3.5 mr-2 text-emerald-500" />
-                    {venue.whyNow}
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6">
-                   <div className="bg-gray-800/40 p-3 rounded-xl flex flex-col items-center border border-gray-800/50">
-                      <span className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">Energy</span>
-                      <span className="text-xs font-black text-gray-300">{venue.energyLevel || 'Med'}</span>
-                   </div>
-                   <div className="bg-gray-800/40 p-3 rounded-xl flex flex-col items-center border border-gray-800/50">
-                      <span className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">Effort</span>
-                      <span className="text-xs font-black text-gray-300">{venue.effortLevel || 'DropIn'}</span>
-                   </div>
-                   <div className="bg-gray-800/40 p-3 rounded-xl flex flex-col items-center border border-gray-800/50">
-                      <span className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">Cost</span>
-                      <span className="text-xs font-black text-gray-300">{venue.costBand || 'Mid'}</span>
-                   </div>
-                   <div className="bg-gray-800/40 p-3 rounded-xl flex flex-col items-center border border-gray-800/50">
-                      <span className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">Env</span>
-                      <span className="text-xs font-black text-gray-300">{venue.environment}</span>
-                   </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <button 
-                    onClick={() => downloadCalendarEvent(venue)}
-                    className="flex items-center justify-center py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95"
-                  >
-                    <Calendar className="w-4 h-4 mr-2" /> Schedule
-                  </button>
-                  <button 
-                    onClick={() => {
-                        const q = encodeURIComponent(`${venue.name} ${venue.location}`);
-                        window.open(`https://www.google.com/maps/search/?api=1&query=${q}`, '_blank');
-                    }}
-                    className="flex items-center justify-center py-4 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border border-gray-700 active:scale-95"
-                  >
-                    <Navigation className="w-4 h-4 mr-2" /> Navigate
-                  </button>
+                
+                <div className="h-1.5 bg-gray-800 w-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 transition-all duration-1000 ease-out" style={{ width: `${venue.score}%` }}></div>
                 </div>
               </div>
-              
-              <div className="h-1.5 bg-gray-800 w-full flex">
-                <div className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400" style={{ width: `${venue.score}%` }}></div>
-              </div>
-            </div>
-          ))
+            ))}
+          </div>
         )}
       </main>
+      
+      <div className="fixed bottom-0 left-0 right-0 p-6 z-20 pointer-events-none">
+        <div className="max-w-2xl mx-auto flex justify-center">
+          <div className="bg-gray-900/90 backdrop-blur-xl px-6 py-3 rounded-full border border-gray-800 shadow-2xl pointer-events-auto flex items-center gap-4">
+            <span className="text-[9px] font-black text-gray-500 uppercase tracking-[0.3em]">
+              <ShieldCheck className="w-3 h-3 inline mr-2 text-emerald-500" />
+              Privacy <span className="text-white">Active</span>
+            </span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
-
-// Internal icon helper
-const ChevronLeft = ({ className }: { className?: string }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-);

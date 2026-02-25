@@ -1,0 +1,161 @@
+// tools/csv-to-places-json.mjs
+import fs from "fs";
+
+const csv = fs.readFileSync("places.csv", "utf8").trim().split("\n");
+const headers = csv[0].split(",").map(s => s.trim());
+const rows = csv.slice(1).map(line => {
+  const cols = line.split(",").map(s => s.trim());
+  const obj = Object.fromEntries(headers.map((h, i) => [h, cols[i] ?? ""]));
+  return {
+    id: obj.id,
+    name: obj.name,
+    area: obj.area,
+    city: obj.city,
+    lat: Number(obj.lat),
+    lng: Number(obj.lng),
+    category: obj.category,
+    subcategory: obj.subcategory,
+    indoor: obj.indoor,
+    covered: obj.covered,
+    ageMin: Number(obj.ageMin || 0),
+    ageMax: Number(obj.ageMax || 99),
+    energyLevel: obj.energyLevel,
+    effortLevel: obj.effortLevel,
+    costBand: obj.costBand,
+    status: obj.status || "OPEN",
+    phone: obj.phone,
+    address: obj.address,
+    url: obj.url,
+    insiderTip: obj.insiderTip,
+    notes: obj.notes
+  };
+});
+fs.writeFileSync("src/places.json", JSON.stringify(rows, null, 2));
+console.log("Wrote src/places.json", rows.length);
+
+
+[
+ 
+ {
+    "id": "little-jungle",
+    "name": "Little Jungle Playground",
+    "area": "Montana",
+    "city": "Pretoria",
+    "lat": -25.6708,
+    "lng": 28.2394,
+    "category": "Active",
+    "subcategory": "IndoorPlay",
+    "indoor": "Y",
+    "covered": "Y",
+    "ageMin": 2,
+    "ageMax": 12,
+    "energyLevel": "High",
+    "effortLevel": "DropIn",
+    "costBand": "Mid",
+    "status": "OPEN",
+    "phone": "+27 66 287 4686",
+    "address": "1032 Silvergrass St, Montana AH, Pretoria, 0182",
+    "url": "https://littlejungle.co.za",
+    "insiderTip": "Great rainy-day energy burn. Separate area for toddlers."
+  },
+  {
+    "id": "wilds-houghton",
+    "name": "The Wilds",
+    "area": "Houghton",
+    "city": "Johannesburg",
+    "lat": -26.1770,
+    "lng": 28.0560,
+    "category": "Nature",
+    "subcategory": "Scenic",
+    "indoor": "N",
+    "covered": "N",
+    "ageMin": 0,
+    "ageMax": 99,
+    "energyLevel": "Medium",
+    "effortLevel": "DropIn",
+    "costBand": "Free",
+    "status": "OPEN",
+    "address": "Joe Slovo Dr, Houghton Estate, Johannesburg",
+    "insiderTip": "Safe city nature walk with iconic animal art sculptures. Best in the morning."
+  },
+  {
+    "id": "bounce-menlyn",
+    "name": "Bounce Inc Menlyn",
+    "area": "Menlyn",
+    "city": "Pretoria",
+    "lat": -25.7831,
+    "lng": 28.2753,
+    "category": "Active",
+    "subcategory": "Trampoline",
+    "indoor": "Y",
+    "covered": "Y",
+    "ageMin": 3,
+    "ageMax": 18,
+    "energyLevel": "High",
+    "effortLevel": "Booked",
+    "costBand": "Mid",
+    "status": "OPEN",
+    "url": "https://www.bounceinc.co.za/",
+    "insiderTip": "X-Park is for older kids. Book socks online to save time."
+  },
+  {
+    "id": "irene-dairy",
+    "name": "Irene Dairy Farm",
+    "area": "Irene",
+    "city": "Centurion",
+    "lat": -25.8784,
+    "lng": 28.2136,
+    "category": "Nature",
+    "subcategory": "Farm",
+    "indoor": "N",
+    "covered": "N",
+    "ageMin": 0,
+    "ageMax": 99,
+    "energyLevel": "Low",
+    "effortLevel": "DropIn",
+    "costBand": "Budget",
+    "status": "OPEN",
+    "address": "Nellmapius Dr, Irene, Centurion",
+    "insiderTip": "Buy the fresh milk and watch the cows get milked in the afternoon."
+  },
+  {
+    "id": "sci-enza",
+    "name": "Sci-Enza Centre",
+    "area": "Hatfield",
+    "city": "Pretoria",
+    "lat": -25.7545,
+    "lng": 28.2315,
+    "category": "Education",
+    "subcategory": "Museum",
+    "indoor": "Y",
+    "covered": "Y",
+    "ageMin": 5,
+    "ageMax": 15,
+    "energyLevel": "Medium",
+    "effortLevel": "DropIn",
+    "costBand": "Budget",
+    "status": "OPEN",
+    "address": "University of Pretoria, Hatfield",
+    "insiderTip": "Interactive exhibits that make science fun. Great for primary schoolers."
+  },
+  {
+    "id": "lion-safari",
+    "name": "Lion & Safari Park",
+    "area": "Lanseria",
+    "city": "Johannesburg",
+    "lat": -25.8912,
+    "lng": 27.8967,
+    "category": "Wildlife",
+    "subcategory": "Safari",
+    "indoor": "N",
+    "covered": "N",
+    "ageMin": 0,
+    "ageMax": 99,
+    "energyLevel": "Medium",
+    "effortLevel": "DropIn",
+    "costBand": "Premium",
+    "status": "OPEN",
+    "address": "R512 Pelindaba Rd, Broederstroom",
+    "insiderTip": "The giraffe feeding platform is a hit with toddlers. Stay for a meal at Bull 'n Bush."
+  }
+]
