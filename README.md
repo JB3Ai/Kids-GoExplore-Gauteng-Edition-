@@ -15,6 +15,21 @@ View your app in AI Studio: https://ai.studio/apps/5dd7202b-76ae-44df-bae8-17d93
 
 1. Install dependencies:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+2. Configure AI provider in `.env.local`:
+
+   OpenAI-compatible (recommended while Gemini is offline):
+
+   ```
+   OPENAI_API_KEY=your_key
+   OPENAI_BASE_URL=https://api.openai.com/v1
+   OPENAI_MODEL=gpt-4.1-mini
+   ```
+
+   Gemini fallback (optional):
+
+   ```
+   GEMINI_API_KEY=your_key
+   ```
+
 3. Run the app:
    `npm run dev`
