@@ -33,5 +33,5 @@ jobs:
           password: ${{ secrets.CPANEL_FTP_PASSWORD }}
           protocol: ftp
           local-dir: ./dist/
-          server-dir: /public_html/kids-goexplore/
+          server-dir: ./kids-goexplore/
           dangerous-clean-slate: false
