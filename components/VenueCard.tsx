@@ -21,6 +21,7 @@ const VenueThumbnail: React.FC<{
   viewMode: 'expanded' | 'list' | 'compact';
 }> = ({ venue, isFavorite, onToggleFavorite, viewMode }) => {
   const [imageSrc, setImageSrc] = useState<string | null>(venue.thumbnailUrl || null);
+  const [imageService, setImageService] = useState<'Gemini' | 'Azure' | 'Unsplash' | null>(venue.thumbnailUrl ? null : null);
   const [loading, setLoading] = useState(!venue.thumbnailUrl);
   const [error, setError] = useState(false);
 
@@ -54,7 +55,10 @@ const VenueThumbnail: React.FC<{
       const loadAiImage = async () => {
         try {
           const fetched = await generateVenueImage(venue.ref, venue.name, venue.tags);
-          if (isMounted) setImageSrc(fetched);
+          if (isMounted) {
+            setImageSrc(fetched.url);
+            setImageService(fetched.service);
+          }
         } catch (e) {
           if (isMounted) setError(true);
         } finally {
@@ -122,7 +126,7 @@ const VenueThumbnail: React.FC<{
           <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-black/60 backdrop-blur-md border border-white/10">
             <Sparkles className="w-2 h-2 text-theme-accent" />
             <span className="text-[7px] font-black text-white uppercase tracking-widest">
-              {venue.thumbnailUrl ? 'Verified' : 'AI Gen'}
+              {venue.thumbnailUrl ? 'Verified' : (imageService ? imageService : 'AI Gen')}
             </span>
           </div>
         </div>

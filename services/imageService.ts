@@ -183,74 +183,111 @@ export const clearImageCache = async () => {
 /**
  * Attempts to fetch a real image URL or generates one using Gemini 3 Pro with Google Search.
  */
-export async function generateVenueImage(ref: string, name: string, tags: string[]): Promise<string> {
+export type VenueImageResult = { url: string, service: 'Gemini' | 'Azure' | 'Unsplash' };
+export async function generateVenueImage(ref: string, name: string, tags: string[]): Promise<VenueImageResult> {
   const cached = await getFromDB(ref);
-  if (cached) return cached;
+  if (cached) return { url: cached, service: 'Gemini' };
 
   // Check server cache
   const serverCached = await getFromServer(ref);
   if (serverCached) {
     saveToDB(ref, serverCached); // Cache locally too
-    return serverCached;
+    return { url: serverCached, service: 'Gemini' };
   }
 
   const fallback = getFallbackImage(tags);
 
   return queueRequest(async () => {
-    try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      
-      return await withRetry(async () => {
-        // Stage 1: Attempt to find a real, direct image URL via model knowledge
-        // Removed googleSearch from flash model as it's officially supported on Pro Image
-        const searchResponse = await ai.models.generateContent({
-          model: 'gemini-3-flash-preview',
-          contents: `Provide a direct, high-resolution public image URL for the venue "${name}" in Gauteng. Return ONLY the URL string. If you don't have a specific URL, return "GENERATE".`,
-        });
-
-        const resultText = searchResponse.text?.trim() || "";
-        if (resultText.startsWith('http') && (resultText.toLowerCase().endsWith('.jpg') || resultText.toLowerCase().endsWith('.png') || resultText.toLowerCase().endsWith('.webp') || resultText.toLowerCase().endsWith('.jpeg'))) {
-          saveToDB(ref, resultText);
-          return resultText;
-        }
-
-        // Stage 2: Fallback to high-quality search-informed generation
-        const genResponse = await ai.models.generateContent({
-          model: 'gemini-3-pro-image-preview',
-          contents: { 
-            parts: [{ 
-              text: `Generate a professional, photorealistic architectural or environmental photograph of the venue "${name}" in Gauteng. Ensure the image is vibrant and accurately reflects the real location. Aspect Ratio: 16:9. No people, no text.` 
-            }] 
-          },
-          config: {
-            imageConfig: { aspectRatio: "16:9", imageSize: "1K" },
-            tools: [{ googleSearch: {} }]
-          }
-        });
-
-        let imageUrl = '';
-        const parts = genResponse.candidates?.[0]?.content?.parts || [];
-        for (const part of parts) {
-          if (part.inlineData) {
-            imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-            break;
-          }
-        }
-
-        if (imageUrl) {
-          saveToDB(ref, imageUrl);
-          return imageUrl;
-        }
-        
-        return fallback;
-      });
-    } catch (error: any) {
-      const errStr = error.toString();
-      if (errStr.includes("Requested entity was not found")) {
-        window.dispatchEvent(new CustomEvent('gemini-reauth-required'));
+    // Check for Gemini API key
+    let apiKey = process.env.API_KEY;
+    if (typeof window !== 'undefined' && (!apiKey || apiKey === '')) {
+      if (window.aistudio && window.aistudio.getSelectedApiKey) {
+        apiKey = await window.aistudio.getSelectedApiKey();
       }
-      console.error("Image Service Error:", error);
-      return fallback;
     }
+    // Try Gemini first
+    if (apiKey && apiKey !== '') {
+      try {
+        const ai = new GoogleGenAI({ apiKey });
+        return await withRetry(async () => {
+          // Stage 1: Attempt to find a real, direct image URL via model knowledge
+          const searchResponse = await ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: `Provide a direct, high-resolution public image URL for the venue "${name}" in Gauteng. Return ONLY the URL string. If you don't have a specific URL, return "GENERATE".`,
+          });
+
+          const resultText = searchResponse.text?.trim() || "";
+          if (resultText.startsWith('http') && (resultText.toLowerCase().endsWith('.jpg') || resultText.toLowerCase().endsWith('.png') || resultText.toLowerCase().endsWith('.webp') || resultText.toLowerCase().endsWith('.jpeg'))) {
+            saveToDB(ref, resultText);
+            return { url: resultText, service: 'Gemini' };
+          }
+
+          // Stage 2: Fallback to high-quality search-informed generation
+          const genResponse = await ai.models.generateContent({
+            model: 'gemini-3-pro-image-preview',
+            contents: { 
+              parts: [{ 
+                text: `Generate a professional, photorealistic architectural or environmental photograph of the venue "${name}" in Gauteng. Ensure the image is vibrant and accurately reflects the real location. Aspect Ratio: 16:9. No people, no text.` 
+              }] 
+            },
+            config: {
+              imageConfig: { aspectRatio: "16:9", imageSize: "1K" },
+              tools: [{ googleSearch: {} }]
+            }
+          });
+
+          let imageUrl = '';
+          const parts = genResponse.candidates?.[0]?.content?.parts || [];
+          for (const part of parts) {
+            if (part.inlineData) {
+              imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+              break;
+            }
+          }
+
+          if (imageUrl) {
+            saveToDB(ref, imageUrl);
+            return { url: imageUrl, service: 'Gemini' };
+          }
+          return fallback;
+        });
+      } catch (error: any) {
+        const errStr = error.toString();
+        if (errStr.includes("Requested entity was not found")) {
+          window.dispatchEvent(new CustomEvent('gemini-reauth-required'));
+        }
+        console.error("Image Service Error (Gemini):", error);
+        // If Gemini fails, try Azure next
+      }
+    }
+    // Azure Fallback
+    try {
+      // Replace with your Azure endpoint and key
+      const azureEndpoint = process.env.AZURE_IMAGE_ENDPOINT;
+      const azureApiKey = process.env.AZURE_IMAGE_KEY;
+      if (azureEndpoint && azureApiKey) {
+        const azurePrompt = `Generate a professional, photorealistic architectural or environmental photograph of the venue '${name}' in Gauteng. Aspect Ratio: 16:9. No people, no text.`;
+        const response = await fetch(azureEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'api-key': azureApiKey
+          },
+          body: JSON.stringify({ prompt: azurePrompt, aspect_ratio: '16:9', tags })
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.imageUrl) {
+            saveToDB(ref, data.imageUrl);
+            return { url: data.imageUrl, service: 'Azure' };
+          }
+        }
+      }
+    } catch (azureError) {
+      console.error('Image Service Error (Azure):', azureError);
+    }
+    // If both fail, fallback to Unsplash
+    console.warn('No Gemini or Azure image available, using fallback image.');
+    return { url: fallback, service: 'Unsplash' };
   });
 }
