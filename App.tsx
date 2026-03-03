@@ -153,7 +153,7 @@ const App: React.FC = () => {
       {/* Logo and Title at top left */}
       <div className="w-full flex items-center pt-8 pb-2 px-8 gap-4">
         <img
-          src="/logo-kids-edition.jpg"
+          src="/logo.png"
           alt="JB³Ai Kids Edition Logo"
           className="w-16 h-16 object-contain rounded-xl border border-theme-primary shadow-xl"
           style={{ background: 'rgba(0,0,0,0.01)' }}
