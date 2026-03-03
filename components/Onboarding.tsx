@@ -150,10 +150,10 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
               <div className="relative w-48 h-48 mx-auto">
                 <div className="absolute inset-0 bg-theme-accent/20 rounded-full animate-pulse opacity-25"></div>
                 <img 
-                  src="/logo-kids-edition.jpg" 
-                  alt="JB³Ai Kids Edition Logo" 
+                  src="/logo.png"
+                  alt="JB³Ai Kids Edition Logo"
                   className="relative w-full h-full object-contain rounded-3xl border border-white/20 shadow-2xl"
-                  onError={e => { e.currentTarget.onerror = null; e.currentTarget.src = 'https://upload.wikimedia.org/wikipedia/commons/a/ac/No_image_available.svg'; }}
+                  onError={e => { e.currentTarget.onerror = null; e.currentTarget.src = '/logo.png'; }}
                 />
               </div>
               <h1 className="text-4xl font-black uppercase tracking-tight leading-none text-white drop-shadow-lg">
