@@ -93,12 +93,29 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
       consentTimestamp: formData.newsletterOptIn ? new Date().toISOString() : undefined
     };
     persistToLocalStorage(finalProfile);
-    
+
     // Sync with backend
     await syncProfileWithBackend(finalProfile.id, {
       favorites: [],
       ratings: {}
     });
+
+    // If newsletterOptIn, send email to leads@jonoblackburn.com
+    if (finalProfile.newsletterOptIn && finalProfile.email) {
+      try {
+        await fetch('https://formspree.io/f/xwkzqgqv', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: finalProfile.email,
+            _subject: 'Friday Brief Subscription',
+            message: `New Friday Brief subscriber: ${finalProfile.email}`
+          })
+        });
+      } catch (e) {
+        // Optionally handle error
+      }
+    }
 
     onComplete(finalProfile);
   };
@@ -133,10 +150,10 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
               <div className="relative w-48 h-48 mx-auto">
                 <div className="absolute inset-0 bg-theme-accent/20 rounded-full animate-pulse opacity-25"></div>
                 <img 
-                  src="https://storage.googleapis.com/multimodal-toolkit-permanent-blobs/2026/02/24/07/05/29/440590/input_file_0.png" 
-                  alt="JB³Ai Logo" 
+                  src="/logo-kids-edition.jpg" 
+                  alt="JB³Ai Kids Edition Logo" 
                   className="relative w-full h-full object-contain rounded-3xl border border-white/20 shadow-2xl"
-                  referrerPolicy="no-referrer"
+                  onError={e => { e.currentTarget.onerror = null; e.currentTarget.src = 'https://upload.wikimedia.org/wikipedia/commons/a/ac/No_image_available.svg'; }}
                 />
               </div>
               <h1 className="text-4xl font-black uppercase tracking-tight leading-none text-white drop-shadow-lg">

@@ -150,6 +150,19 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-theme-primary">
+      {/* Logo and Title at top left */}
+      <div className="w-full flex items-center pt-8 pb-2 px-8 gap-4">
+        <img
+          src="/logo-kids-edition.jpg"
+          alt="JB³Ai Kids Edition Logo"
+          className="w-16 h-16 object-contain rounded-xl border border-theme-primary shadow-xl"
+          style={{ background: 'rgba(0,0,0,0.01)' }}
+        />
+        <div className="flex flex-col">
+          <span className="text-lg font-black uppercase tracking-tight text-theme-primary leading-none">JB³Ai Explore <span className="text-green-600">Gauteng</span></span>
+          <span className="text-xs font-bold uppercase tracking-widest text-theme-secondary mt-1">Kids Edition</span>
+        </div>
+      </div>
       <main className="pb-32">
         {activeTab === 'now' ? (
           <MainNowScreen venues={venues} profile={profile} theme={theme} />
@@ -157,7 +170,6 @@ const App: React.FC = () => {
           <ExploreScreen venues={venues} profile={profile} theme={theme} />
         )}
       </main>
-      
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 z-40 px-6 pb-8 pointer-events-none">
         <div className="max-w-md mx-auto pointer-events-auto">

@@ -101,10 +101,9 @@ export default function ExploreScreen({ venues, profile, theme }: ExploreScreenP
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img 
-              src="https://storage.googleapis.com/multimodal-toolkit-permanent-blobs/2026/02/24/07/05/29/440590/input_file_0.png" 
-              alt="JB³Ai Logo" 
+              src="/logo-kids-edition.jpg" 
+              alt="JB³Ai Kids Edition Logo" 
               className="w-10 h-10 rounded-lg object-cover border border-theme-primary"
-              referrerPolicy="no-referrer"
             />
             <div className="flex flex-col">
               <h1 className="text-xl font-black uppercase tracking-tight leading-none mb-1">JB³Ai Explore <span className="text-theme-accent">Gauteng</span></h1>
