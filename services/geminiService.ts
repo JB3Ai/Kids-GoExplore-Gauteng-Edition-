@@ -35,7 +35,7 @@ async function getVenueDeepDiveWithOpenAI(prompt: string): Promise<string> {
 
 async function getVenueDeepDiveWithAzure(prompt: string): Promise<string> {
   if (!azureEndpoint || !azureKey) throw new Error('Azure OpenAI not configured');
-  const url = `${azureEndpoint}/openai/deployments/${azureDeployment}/chat/completions?api-version=2024-02-01`;
+  const url = `${azureEndpoint}/openai/deployments/${azureDeployment}/chat/completions?api-version=${process.env.AZURE_OPENAI_API_VERSION || '2025-01-01-preview'}`;
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'api-key': azureKey },
