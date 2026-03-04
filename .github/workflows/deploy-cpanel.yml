@@ -31,7 +31,16 @@ jobs:
           server: ${{ secrets.CPANEL_FTP_SERVER }}
           username: ${{ secrets.CPANEL_FTP_USERNAME }}
           password: ${{ secrets.CPANEL_FTP_PASSWORD }}
-          protocol: ftp
+          protocol: ftps
+          port: 21
+          security: loose
           local-dir: ./dist/
           server-dir: ./public_html/kids-goexplore/
+          timeout: 600000
+          log-level: verbose
           dangerous-clean-slate: false
+          exclude: |
+            **/.git*/**
+            **/.git*
+            **/node_modules/**
+            **/.DS_Store
