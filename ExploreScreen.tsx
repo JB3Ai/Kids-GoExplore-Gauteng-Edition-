@@ -101,7 +101,7 @@ export default function ExploreScreen({ venues, profile, theme }: ExploreScreenP
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img 
-              src="/logo-kids-edition.jpg" 
+              src="/logo.png" 
               alt="JB³Ai Kids Edition Logo" 
               className="w-10 h-10 rounded-lg object-cover border border-theme-primary"
             />
