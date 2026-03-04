@@ -23,7 +23,8 @@ export default defineConfig(({ mode }) => {
         'process.env.OPENAI_MODEL': JSON.stringify(env.OPENAI_MODEL),
         'process.env.AZURE_OPENAI_KEY': JSON.stringify(env.AZURE_OPENAI_KEY),
         'process.env.AZURE_OPENAI_ENDPOINT': JSON.stringify(env.AZURE_OPENAI_ENDPOINT),
-        'process.env.AZURE_OPENAI_DEPLOYMENT': JSON.stringify(env.AZURE_OPENAI_DEPLOYMENT)
+        'process.env.AZURE_OPENAI_DEPLOYMENT': JSON.stringify(env.AZURE_OPENAI_DEPLOYMENT),
+        'process.env.AZURE_OPENAI_API_VERSION': JSON.stringify(env.AZURE_OPENAI_API_VERSION)
       },
       resolve: {
         alias: {
