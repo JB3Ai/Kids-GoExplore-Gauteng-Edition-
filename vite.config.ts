@@ -20,7 +20,10 @@ export default defineConfig(({ mode }) => {
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.OPENAI_API_KEY': JSON.stringify(env.OPENAI_API_KEY),
         'process.env.OPENAI_BASE_URL': JSON.stringify(env.OPENAI_BASE_URL),
-        'process.env.OPENAI_MODEL': JSON.stringify(env.OPENAI_MODEL)
+        'process.env.OPENAI_MODEL': JSON.stringify(env.OPENAI_MODEL),
+        'process.env.AZURE_OPENAI_KEY': JSON.stringify(env.AZURE_OPENAI_KEY),
+        'process.env.AZURE_OPENAI_ENDPOINT': JSON.stringify(env.AZURE_OPENAI_ENDPOINT),
+        'process.env.AZURE_OPENAI_DEPLOYMENT': JSON.stringify(env.AZURE_OPENAI_DEPLOYMENT)
       },
       resolve: {
         alias: {
