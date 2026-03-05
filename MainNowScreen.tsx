@@ -218,10 +218,9 @@ export default function MainNowScreen({ venues, profile, theme }: MainNowScreenP
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <img 
-              src="https://storage.googleapis.com/multimodal-toolkit-permanent-blobs/2026/02/24/07/05/29/440590/input_file_0.png" 
+              src={`${import.meta.env.BASE_URL}logo.png`} 
               alt="JB³Ai Logo" 
               className="w-12 h-12 rounded-2xl object-cover border border-theme-primary shadow-lg"
-              referrerPolicy="no-referrer"
             />
             <div>
               <h1 className="text-xl font-black uppercase tracking-tight text-theme-primary">Do This <span className="text-theme-accent">Now.</span></h1>

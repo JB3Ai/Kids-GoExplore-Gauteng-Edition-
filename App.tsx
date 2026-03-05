@@ -3,9 +3,10 @@ import { Onboarding } from './components/Onboarding.tsx';
 import MainNowScreen from './MainNowScreen.tsx';
 import ExploreScreen from './ExploreScreen.tsx';
 import { SettingsModal } from './components/SettingsModal.tsx';
+import { InfoModal } from './components/InfoModal.tsx';
 import { fetchVenues, loadProfileFromBackend, syncProfileWithBackend, getFavorites } from './services/sheetService.ts';
 import { Venue, UserProfile, DistanceCategory, AppTheme } from './types.ts';
-import { Key, Zap, Search, Settings, Loader2 } from 'lucide-react';
+import { Key, Zap, Search, Settings, Loader2, Info } from 'lucide-react';
 
 declare global {
   interface AIStudio {
@@ -27,6 +28,7 @@ const App: React.FC = () => {
   const [venues, setVenues] = useState<Venue[]>([]);
   const [loadingVenues, setLoadingVenues] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isInfoOpen, setIsInfoOpen] = useState(false);
   
   // Theme state: Defaulting to dark as per new aesthetic request
   const [theme, setTheme] = useState<AppTheme>(() => {
@@ -153,7 +155,7 @@ const App: React.FC = () => {
       {/* Logo and Title at top left */}
       <div className="w-full flex items-center pt-8 pb-2 px-8 gap-4">
         <img
-          src="/logo.png"
+          src={`${import.meta.env.BASE_URL}logo.png`}
           alt="JB³Ai Kids Edition Logo"
           className="w-16 h-16 object-contain rounded-xl border border-theme-primary shadow-xl"
           style={{ background: 'rgba(0,0,0,0.01)' }}
@@ -162,6 +164,13 @@ const App: React.FC = () => {
           <span className="text-lg font-black uppercase tracking-tight text-theme-primary leading-none">JB³Ai Explore <span className="text-green-600">Gauteng</span></span>
           <span className="text-xs font-bold uppercase tracking-widest text-theme-secondary mt-1">Kids Edition</span>
         </div>
+        <button
+          onClick={() => setIsInfoOpen(true)}
+          className="ml-auto w-10 h-10 flex items-center justify-center rounded-full bg-theme-secondary/60 hover:bg-theme-secondary border border-theme-primary text-theme-secondary hover:text-theme-primary transition-all"
+          aria-label="App info"
+        >
+          <Info className="w-5 h-5" />
+        </button>
       </div>
       <main className="pb-32">
         {activeTab === 'now' ? (
@@ -197,6 +206,8 @@ const App: React.FC = () => {
           </div>
         </div>
       </nav>
+
+      <InfoModal isOpen={isInfoOpen} onClose={() => setIsInfoOpen(false)} />
 
       <SettingsModal 
         isOpen={isSettingsOpen} 
