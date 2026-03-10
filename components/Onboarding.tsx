@@ -87,37 +87,54 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
       setError("Please enter a valid phone number to continue.");
       return;
     }
-    const finalProfile = { 
-      ...formData, 
-      onboarded: true,
-      consentTimestamp: formData.newsletterOptIn ? new Date().toISOString() : undefined
-    };
-    persistToLocalStorage(finalProfile);
+    setLoading(true);
+    setError(null);
+    try {
+      const finalProfile = { 
+        ...formData, 
+        onboarded: true,
+        consentTimestamp: formData.newsletterOptIn ? new Date().toISOString() : undefined
+      };
+      persistToLocalStorage(finalProfile);
 
-    // Sync with backend
-    await syncProfileWithBackend(finalProfile.id, {
-      favorites: [],
-      ratings: {}
-    });
+      // Sync with backend
+      await syncProfileWithBackend(finalProfile.id, {
+        favorites: [],
+        ratings: {}
+      });
 
-    // If newsletterOptIn, send email to leads@jonoblackburn.com
-    if (finalProfile.newsletterOptIn && finalProfile.email) {
-      try {
-        await fetch('https://formspree.io/f/xwkzqgqv', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: finalProfile.email,
-            _subject: 'Friday Brief Subscription',
-            message: `New Friday Brief subscriber: ${finalProfile.email}`
-          })
-        });
-      } catch (e) {
-        // Optionally handle error
+      // If newsletterOptIn, send signup to Formspree
+      if (finalProfile.newsletterOptIn && finalProfile.email) {
+        try {
+          const res = await fetch('https://formspree.io/f/xwkzqgqv', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+              email: finalProfile.email,
+              _replyto: finalProfile.email,
+              _subject: 'Friday Brief Subscription',
+              message: `New Friday Brief subscriber: ${finalProfile.email}`,
+              phone: finalProfile.phone || ''
+            })
+          });
+          if (!res.ok) {
+            console.error('Formspree error:', res.status, await res.text());
+          }
+        } catch (e) {
+          console.error('Newsletter signup failed:', e);
+        }
       }
-    }
 
-    onComplete(finalProfile);
+      onComplete(finalProfile);
+    } catch (e) {
+      console.error('Finish setup failed:', e);
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const updateAge = (type: 'min' | 'max', val: number) => {
@@ -310,9 +327,14 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
             <div className="space-y-4">
               <button 
                 onClick={handleFinish}
-                className="w-full py-5 bg-theme-accent hover:opacity-90 text-gray-950 rounded-[1.5rem] font-black uppercase tracking-widest flex items-center justify-center transition-all shadow-xl active:scale-95"
+                disabled={loading}
+                className="w-full py-5 bg-theme-accent hover:opacity-90 text-gray-950 rounded-[1.5rem] font-black uppercase tracking-widest flex items-center justify-center transition-all shadow-xl active:scale-95 disabled:opacity-50"
               >
-                Finish Setup <Check className="w-6 h-6 ml-2" />
+                {loading ? (
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                ) : (
+                  <>Finish Setup <Check className="w-6 h-6 ml-2" /></>
+                )}
               </button>
               {error && <p className="text-center text-[10px] text-theme-accent font-black uppercase tracking-[0.2em] animate-pulse">{error}</p>}
             </div>
