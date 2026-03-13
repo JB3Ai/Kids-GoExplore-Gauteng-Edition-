@@ -103,10 +103,11 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
         ratings: {}
       });
 
-      // If newsletterOptIn, send signup to Formspree
+      // If newsletterOptIn, send signup to our own PHP endpoint
       if (finalProfile.newsletterOptIn && finalProfile.email) {
         try {
-          const res = await fetch('https://formspree.io/f/xwkzqgqv', {
+          const base = import.meta.env.BASE_URL || '/kids-goexplore/';
+          const res = await fetch(`${base}api/subscribe.php`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -114,14 +115,12 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
             },
             body: JSON.stringify({
               email: finalProfile.email,
-              _replyto: finalProfile.email,
-              _subject: 'Friday Brief Subscription',
-              message: `New Friday Brief subscriber: ${finalProfile.email}`,
-              phone: finalProfile.phone || ''
+              phone: finalProfile.phone || '',
+              source: 'Kids GoExplore Gauteng'
             })
           });
           if (!res.ok) {
-            console.error('Formspree error:', res.status, await res.text());
+            console.error('Subscribe error:', res.status, await res.text());
           }
         } catch (e) {
           console.error('Newsletter signup failed:', e);
