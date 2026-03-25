@@ -27,7 +27,7 @@ $email = filter_var($input['email'], FILTER_SANITIZE_EMAIL);
 $phone = isset($input['phone']) ? substr(preg_replace('/[^0-9+\- ]/', '', $input['phone']), 0, 20) : '';
 $source = isset($input['source']) ? substr(strip_tags($input['source']), 0, 100) : 'Kids GoExplore';
 
-$to = 'lead@jonoblackburn.com';
+$to = 'hi@jb3ai.com';
 $subject = 'Friday Brief Subscription - ' . $source;
 
 $body = "New Friday Brief subscriber:\n\n";
@@ -36,7 +36,7 @@ if ($phone) $body .= "Phone: " . $phone . "\n";
 $body .= "Source: " . $source . "\n";
 $body .= "Date: " . date('Y-m-d H:i:s T') . "\n";
 
-$headers = "From: noreply@jonoblackburn.com\r\n";
+$headers = "From: hi@jb3ai.com\r\n";
 $headers .= "Reply-To: " . $email . "\r\n";
 $headers .= "X-Mailer: PHP/" . phpversion();
 
@@ -48,3 +48,5 @@ if ($sent) {
     http_response_code(500);
     echo json_encode(['success' => false, 'error' => 'Mail delivery failed']);
 }
+
+

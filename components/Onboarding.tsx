@@ -95,36 +95,23 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
         onboarded: true,
         consentTimestamp: formData.newsletterOptIn ? new Date().toISOString() : undefined
       };
-      persistToLocalStorage(finalProfile);
-
-      // Sync with backend
+      persistToLocalStorage(finalProfile);      // Sync with backend
       await syncProfileWithBackend(finalProfile.id, {
         favorites: [],
         ratings: {}
       });
 
-      // If newsletterOptIn, send signup to our own PHP endpoint
+      // For now we use a direct mailto handoff instead of a backend signup service.
       if (finalProfile.newsletterOptIn && finalProfile.email) {
-        try {
-          const base = import.meta.env.BASE_URL || '/kids-goexplore/';
-          const res = await fetch(`${base}api/subscribe.php`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            },
-            body: JSON.stringify({
-              email: finalProfile.email,
-              phone: finalProfile.phone || '',
-              source: 'Kids GoExplore Gauteng'
-            })
-          });
-          if (!res.ok) {
-            console.error('Subscribe error:', res.status, await res.text());
-          }
-        } catch (e) {
-          console.error('Newsletter signup failed:', e);
-        }
+        const subject = encodeURIComponent('Kids GoExplore Gauteng - Friday Brief Signup');
+        const body = encodeURIComponent(
+          'New Kids GoExplore signup request:\n\n' +
+          `Email: ${finalProfile.email}\n` +
+          `Phone: ${finalProfile.phone || 'Not supplied'}\n` +
+          'Source: Kids GoExplore Gauteng\n' +
+          `Submitted: ${new Date().toISOString()}`
+        );
+        window.location.href = `mailto:hi@jb3ai.com?subject=${subject}&body=${body}`;
       }
 
       onComplete(finalProfile);
@@ -349,3 +336,4 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
     </div>
   );
 };
+
